@@ -1,0 +1,37 @@
+[
+  {
+    "id": "c-1",
+    "name": "Alex Carter",
+    "status": "online",
+    "avatar": "https://i.pravatar.cc/150?u=alex",
+    "bio": "Available"
+  },
+  {
+    "id": "c-2",
+    "name": "David Kim",
+    "status": "busy",
+    "avatar": "https://i.pravatar.cc/150?u=david",
+    "bio": "PM"
+  },
+  {
+    "id": "c-3",
+    "name": "Elena Rodriguez",
+    "status": "offline",
+    "avatar": "https://i.pravatar.cc/150?u=elena",
+    "bio": "Frontend eng"
+  },
+  {
+    "id": "c-4",
+    "name": "Marcus Johnson",
+    "status": "away",
+    "avatar": "https://i.pravatar.cc/150?u=marcus",
+    "bio": "DevOps"
+  },
+  {
+    "id": "c-5",
+    "name": "Sarah Chen",
+    "status": "online",
+    "avatar": "https://i.pravatar.cc/150?u=sarah",
+    "bio": "Designer across the hall"
+  }
+]

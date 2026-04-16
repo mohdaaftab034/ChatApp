@@ -1,0 +1,23 @@
+{
+  "account": {
+    "username": "janedoe",
+    "email": "jane@example.com",
+    "phone": "+1 234 567 8900"
+  },
+  "privacy": {
+    "lastSeen": "nobody",
+    "profilePhoto": "contacts",
+    "readReceipts": true,
+    "blockedContacts": 2
+  },
+  "notifications": {
+    "messageSounds": true,
+    "desktopNotifications": true,
+    "previewText": false,
+    "muteAll": false
+  },
+  "theme": {
+    "mode": "dark",
+    "chatColors": "default"
+  }
+}

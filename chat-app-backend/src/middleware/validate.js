@@ -1,0 +1,15 @@
+function validate(schema) {
+  return (req, _res, next) => {
+    const parsed = schema.safeParse({ body: req.body, params: req.params, query: req.query })
+    if (!parsed.success) {
+      const error = new Error(parsed.error.issues[0]?.message || 'Validation failed')
+      error.statusCode = 400
+      return next(error)
+    }
+
+    req.validated = parsed.data
+    return next()
+  }
+}
+
+module.exports = { validate }

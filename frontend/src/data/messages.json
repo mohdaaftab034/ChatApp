@@ -1,0 +1,85 @@
+{
+  "conv-1": [
+    {
+      "id": "msg-100",
+      "conversationId": "conv-1",
+      "senderId": "1",
+      "type": "text",
+      "text": "Hey Sarah, did you happen to look at the new mockups?",
+      "reactions": [
+        {
+          "emoji": "👍",
+          "userIds": ["user-2"]
+        }
+      ],
+      "readBy": ["user-2"],
+      "deliveredTo": ["user-2"],
+      "isEdited": false,
+      "isDeleted": false,
+      "isPinned": false,
+      "isStarred": false,
+      "createdAt": "2026-04-12T10:10:00Z",
+      "updatedAt": "2026-04-12T10:10:00Z"
+    },
+    {
+      "id": "msg-101",
+      "conversationId": "conv-1",
+      "senderId": "user-2",
+      "type": "text",
+      "text": "Are we still on for the design review at 3PM?",
+      "reactions": [],
+      "readBy": [],
+      "deliveredTo": ["1"],
+      "isEdited": false,
+      "isDeleted": false,
+      "isPinned": false,
+      "isStarred": false,
+      "createdAt": "2026-04-12T10:15:00Z",
+      "updatedAt": "2026-04-12T10:15:00Z"
+    }
+  ],
+  "conv-2": [
+    {
+      "id": "msg-200",
+      "conversationId": "conv-2",
+      "senderId": "user-4",
+      "type": "text",
+      "text": "Can someone help me with the new state management store?",
+      "reactions": [],
+      "readBy": ["1", "user-3"],
+      "deliveredTo": ["1", "user-3"],
+      "isEdited": false,
+      "isDeleted": false,
+      "isPinned": false,
+      "isStarred": false,
+      "createdAt": "2026-04-12T08:20:00Z",
+      "updatedAt": "2026-04-12T08:20:00Z"
+    },
+    {
+      "id": "msg-201",
+      "conversationId": "conv-2",
+      "senderId": "user-3",
+      "type": "text",
+      "text": "I just deployed the latest updates to staging.",
+      "replyTo": {
+        "messageId": "msg-200",
+        "text": "Can someone help me with the new state management store?",
+        "senderName": "Elena Rodriguez"
+      },
+      "reactions": [
+        {
+          "emoji": "🔥",
+          "userIds": ["1"]
+        }
+      ],
+      "readBy": ["1", "user-4"],
+      "deliveredTo": ["1", "user-4"],
+      "isEdited": false,
+      "isDeleted": false,
+      "isPinned": false,
+      "isStarred": false,
+      "createdAt": "2026-04-12T08:30:00Z",
+      "updatedAt": "2026-04-12T08:30:00Z"
+    }
+  ]
+}

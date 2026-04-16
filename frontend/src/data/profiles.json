@@ -1,0 +1,122 @@
+[
+  {
+    "id": "me",
+    "name": "Jane Doe",
+    "username": "janedoe",
+    "avatar": "https://i.pravatar.cc/240?u=jane",
+    "status": "online",
+    "headline": "Product engineer building realtime chat experiences",
+    "bio": "Loves clean UI systems, keyboard shortcuts, and shipping delightful product details.",
+    "email": "jane@example.com",
+    "phone": "+1 234 567 8900",
+    "location": "San Francisco, CA",
+    "department": "Product",
+    "role": "Senior Frontend Engineer",
+    "joinedAt": "2022-05-18",
+    "social": {
+      "website": "https://example.com/jane",
+      "linkedin": "https://linkedin.com/in/janedoe",
+      "x": "https://x.com/janedoe"
+    }
+  },
+  {
+    "id": "c-1",
+    "name": "Alex Carter",
+    "username": "alexcarter",
+    "avatar": "https://i.pravatar.cc/240?u=alex",
+    "status": "online",
+    "headline": "Platform engineer focused on performance",
+    "bio": "Builds low-latency APIs and keeps infrastructure calm under pressure.",
+    "email": "alex.carter@example.com",
+    "phone": "+1 415 640 1122",
+    "location": "Seattle, WA",
+    "department": "Platform",
+    "role": "Backend Engineer",
+    "joinedAt": "2021-10-09",
+    "social": {
+      "website": "https://example.com/alex",
+      "linkedin": "https://linkedin.com/in/alexcarter",
+      "x": "https://x.com/alexcarter"
+    }
+  },
+  {
+    "id": "c-2",
+    "name": "David Kim",
+    "username": "davidkim",
+    "avatar": "https://i.pravatar.cc/240?u=david",
+    "status": "busy",
+    "headline": "PM for messaging and collaboration",
+    "bio": "Turns customer stories into product decisions and roadmap priorities.",
+    "email": "david.kim@example.com",
+    "phone": "+1 408 555 0178",
+    "location": "Austin, TX",
+    "department": "Product",
+    "role": "Product Manager",
+    "joinedAt": "2020-02-03",
+    "social": {
+      "website": "https://example.com/david",
+      "linkedin": "https://linkedin.com/in/davidkim",
+      "x": "https://x.com/davidkim"
+    }
+  },
+  {
+    "id": "c-3",
+    "name": "Elena Rodriguez",
+    "username": "elenar",
+    "avatar": "https://i.pravatar.cc/240?u=elena",
+    "status": "offline",
+    "headline": "Frontend specialist for accessibility",
+    "bio": "Designs and builds inclusive interfaces with strong UX foundations.",
+    "email": "elena.rodriguez@example.com",
+    "phone": "+1 646 555 0131",
+    "location": "New York, NY",
+    "department": "Design Systems",
+    "role": "Frontend Engineer",
+    "joinedAt": "2023-01-22",
+    "social": {
+      "website": "https://example.com/elena",
+      "linkedin": "https://linkedin.com/in/elenarodriguez",
+      "x": "https://x.com/elenar"
+    }
+  },
+  {
+    "id": "c-4",
+    "name": "Marcus Johnson",
+    "username": "marcusj",
+    "avatar": "https://i.pravatar.cc/240?u=marcus",
+    "status": "away",
+    "headline": "DevOps engineer automating everything",
+    "bio": "Owns deployment pipelines, observability, and reliability operations.",
+    "email": "marcus.johnson@example.com",
+    "phone": "+1 303 555 0199",
+    "location": "Denver, CO",
+    "department": "Infrastructure",
+    "role": "DevOps Engineer",
+    "joinedAt": "2019-08-14",
+    "social": {
+      "website": "https://example.com/marcus",
+      "linkedin": "https://linkedin.com/in/marcusjohnson",
+      "x": "https://x.com/marcusjohnson"
+    }
+  },
+  {
+    "id": "c-5",
+    "name": "Sarah Chen",
+    "username": "sarahchen",
+    "avatar": "https://i.pravatar.cc/240?u=sarah",
+    "status": "online",
+    "headline": "Brand and product designer",
+    "bio": "Creates visual systems and interaction language for communication products.",
+    "email": "sarah.chen@example.com",
+    "phone": "+1 212 555 0144",
+    "location": "Boston, MA",
+    "department": "Design",
+    "role": "Product Designer",
+    "joinedAt": "2024-04-30",
+    "social": {
+      "website": "https://example.com/sarah",
+      "linkedin": "https://linkedin.com/in/sarahchen",
+      "x": "https://x.com/sarahchen"
+    }
+  }
+]

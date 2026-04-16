@@ -1,0 +1,171 @@
+[
+  {
+    "id": "conv-1",
+    "type": "direct",
+    "participants": [
+      {
+        "id": "user-2",
+        "name": "Sarah Chen",
+        "username": "sarahc",
+        "email": "sarah@example.com",
+        "avatar": "https://i.pravatar.cc/150?u=sarah",
+        "status": "online",
+        "lastSeen": null,
+        "bio": "Designer across the hall",
+        "isVerified": true
+      },
+      {
+        "id": "1",
+        "name": "Jane Doe",
+        "username": "janedoe",
+        "email": "jane@example.com",
+        "avatar": null,
+        "status": "online",
+        "lastSeen": null,
+        "bio": "Hello!",
+        "isVerified": true
+      }
+    ],
+    "lastMessage": {
+      "id": "msg-101",
+      "conversationId": "conv-1",
+      "senderId": "user-2",
+      "type": "text",
+      "text": "Are we still on for the design review at 3PM?",
+      "reactions": [],
+      "readBy": [],
+      "deliveredTo": [],
+      "isEdited": false,
+      "isDeleted": false,
+      "isPinned": false,
+      "isStarred": false,
+      "createdAt": "2026-04-12T10:15:00Z",
+      "updatedAt": "2026-04-12T10:15:00Z"
+    },
+    "unreadCount": 1,
+    "isPinned": true,
+    "isMuted": false,
+    "isArchived": false,
+    "createdAt": "2025-10-01T12:00:00Z"
+  },
+  {
+    "id": "conv-2",
+    "type": "group",
+    "participants": [
+      {
+        "id": "user-3",
+        "name": "Marcus Johnson",
+        "username": "mjohnson",
+        "email": "marcus@example.com",
+        "avatar": "https://i.pravatar.cc/150?u=marcus",
+        "status": "away",
+        "lastSeen": "2026-04-12T09:00:00Z",
+        "bio": "DevOps",
+        "isVerified": true
+      },
+      {
+        "id": "user-4",
+        "name": "Elena Rodriguez",
+        "username": "erodriguez",
+        "email": "elena@example.com",
+        "avatar": "https://i.pravatar.cc/150?u=elena",
+        "status": "offline",
+        "lastSeen": "2026-04-11T18:00:00Z",
+        "bio": "Frontend eng",
+        "isVerified": false
+      },
+      {
+        "id": "1",
+        "name": "Jane Doe",
+        "username": "janedoe",
+        "email": "jane@example.com",
+        "avatar": null,
+        "status": "online",
+        "lastSeen": null,
+        "bio": "Hello!",
+        "isVerified": true
+      }
+    ],
+    "lastMessage": {
+      "id": "msg-201",
+      "conversationId": "conv-2",
+      "senderId": "user-3",
+      "type": "text",
+      "text": "I just deployed the latest updates to staging.",
+      "reactions": [],
+      "readBy": ["1", "user-4"],
+      "deliveredTo": ["1", "user-4"],
+      "isEdited": false,
+      "isDeleted": false,
+      "isPinned": false,
+      "isStarred": false,
+      "createdAt": "2026-04-12T08:30:00Z",
+      "updatedAt": "2026-04-12T08:30:00Z"
+    },
+    "unreadCount": 0,
+    "isPinned": false,
+    "isMuted": false,
+    "isArchived": false,
+    "createdAt": "2026-01-15T10:00:00Z",
+    "group": {
+      "name": "Frontend Guild",
+      "avatar": "https://i.pravatar.cc/150?u=group1",
+      "description": "Team chat for frontend engineers",
+      "adminIds": ["1"],
+      "inviteLink": "chat.app/group/frontend",
+      "settings": {
+        "whoCanSend": "all",
+        "whoCanAdd": "admins"
+      }
+    }
+  },
+  {
+    "id": "conv-3",
+    "type": "direct",
+    "participants": [
+      {
+        "id": "user-5",
+        "name": "David Kim",
+        "username": "dkim",
+        "email": "david@example.com",
+        "avatar": "https://i.pravatar.cc/150?u=david",
+        "status": "busy",
+        "lastSeen": null,
+        "bio": "PM",
+        "isVerified": true
+      },
+      {
+        "id": "1",
+        "name": "Jane Doe",
+        "username": "janedoe",
+        "email": "jane@example.com",
+        "avatar": null,
+        "status": "online",
+        "lastSeen": null,
+        "bio": "Hello!",
+        "isVerified": true
+      }
+    ],
+    "lastMessage": {
+      "id": "msg-301",
+      "conversationId": "conv-3",
+      "senderId": "1",
+      "type": "text",
+      "text": "Sounds good, I'll review it tomorrow.",
+      "reactions": [],
+      "readBy": ["user-5"],
+      "deliveredTo": ["user-5"],
+      "isEdited": false,
+      "isDeleted": false,
+      "isPinned": false,
+      "isStarred": false,
+      "createdAt": "2026-04-11T16:45:00Z",
+      "updatedAt": "2026-04-11T16:45:00Z"
+    },
+    "unreadCount": 0,
+    "isPinned": false,
+    "isMuted": true,
+    "isArchived": false,
+    "createdAt": "2026-02-20T09:30:00Z"
+  }
+]
