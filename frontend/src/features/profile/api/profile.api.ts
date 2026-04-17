@@ -19,6 +19,7 @@ export type ProfileData = {
     linkedin: string
     x: string
   }
+  isBlocked?: boolean
 }
 
 type ApiEnvelope<T> = {
@@ -69,5 +70,15 @@ export async function updateMyProfileApi(payload: {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
 
+  return response.data.data
+}
+
+export async function blockUserApi(userId: string) {
+  const response = await api.post<ApiEnvelope<{ blockedUserId: string }>>(`/users/${userId}/block`)
+  return response.data.data
+}
+
+export async function unblockUserApi(userId: string) {
+  const response = await api.delete<ApiEnvelope<{ unblockedUserId: string }>>(`/users/${userId}/block`)
   return response.data.data
 }

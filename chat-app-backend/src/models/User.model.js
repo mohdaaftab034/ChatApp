@@ -26,6 +26,7 @@ const userSchema = new mongoose.Schema(
     },
     role: { type: String, enum: ['user', 'admin'], default: 'user' },
     isVerified: { type: Boolean, default: false },
+    blockedUserIds: { type: [String], default: [] },
     e2ee: {
       activeKeyId: { type: String, default: null },
       publicKey: { type: String, default: null },
@@ -38,6 +39,37 @@ const userSchema = new mongoose.Schema(
           },
         ],
         default: [],
+      },
+    },
+    privacy: {
+      lastSeen: {
+        type: String,
+        enum: ['nobody', 'contacts', 'everyone'],
+        default: 'contacts',
+      },
+      profilePhoto: {
+        type: String,
+        enum: ['nobody', 'contacts', 'everyone'],
+        default: 'everyone',
+      },
+      onlineStatus: {
+        type: String,
+        enum: ['nobody', 'contacts', 'everyone'],
+        default: 'contacts',
+      },
+      typingStatus: {
+        type: String,
+        enum: ['nobody', 'contacts', 'everyone'],
+        default: 'contacts',
+      },
+      aboutInfo: {
+        type: String,
+        enum: ['nobody', 'contacts', 'everyone'],
+        default: 'everyone',
+      },
+      readReceipts: {
+        type: Boolean,
+        default: true,
       },
     },
   },

@@ -2,6 +2,17 @@ import { create } from 'zustand'
 import { Conversation } from '../types/conversation.types'
 import { Message, Reaction } from '../types/message.types'
 
+function getLastMessageTimestamp(conversation: Conversation) {
+  const raw = conversation?.lastMessage?.createdAt
+  if (!raw) return Number.NEGATIVE_INFINITY
+  const ts = new Date(raw).getTime()
+  return Number.isFinite(ts) ? ts : Number.NEGATIVE_INFINITY
+}
+
+function sortByMessageActivity(conversations: Conversation[]) {
+  return [...conversations].sort((a, b) => getLastMessageTimestamp(b) - getLastMessageTimestamp(a))
+}
+
 interface ChatState {
   conversations: Conversation[]
   activeConversationId: string | null
@@ -29,7 +40,7 @@ interface ChatState {
   setTyping: (conversationId: string, userId: string, isTyping: boolean) => void
   setOnlineUsers: (userIds: string[]) => void
   setUserOnline: (userId: string) => void
-  setUserOffline: (userId: string) => void
+  setUserOffline: (userId: string, lastSeen?: string | null) => void
   addReaction: (conversationId: string, msgId: string, reaction: Reaction) => void
   markMessagesRead: (conversationId: string, messageIds: string[], readerId: string) => void
 }
@@ -43,34 +54,38 @@ export const useChatStore = create<ChatState>((set) => ({
   pinnedMessages: {},
   searchQuery: '',
 
-  setConversations: (c) => set({ conversations: c }),
+  setConversations: (c) => set({ conversations: sortByMessageActivity(c) }),
   
   addConversation: (c) => set((state) => {
     const exists = state.conversations.some((conversation) => conversation.id === c.id)
     if (exists) {
+      const merged = state.conversations.map((conversation) =>
+        conversation.id === c.id ? { ...conversation, ...c } : conversation
+      )
       return {
-        conversations: state.conversations.map((conversation) =>
-          conversation.id === c.id ? { ...conversation, ...c } : conversation
-        ),
+        conversations: sortByMessageActivity(merged),
       }
     }
 
-    return { conversations: [c, ...state.conversations] }
+    return { conversations: sortByMessageActivity([...state.conversations, c]) }
   }),
   
   updateConversation: (id, partial) => set((state) => {
     const exists = state.conversations.some((conversation) => conversation.id === id)
 
     if (!exists) {
+      const appended = [...state.conversations, { id, ...partial } as Conversation]
       return {
-        conversations: [{ id, ...partial } as Conversation, ...state.conversations],
+        conversations: sortByMessageActivity(appended),
       }
     }
 
+    const merged = state.conversations.map((conversation) =>
+      conversation.id === id ? { ...conversation, ...partial } : conversation
+    )
+
     return {
-      conversations: state.conversations.map((conversation) =>
-        conversation.id === id ? { ...conversation, ...partial } : conversation
-      ),
+      conversations: sortByMessageActivity(merged),
     }
   }),
 
@@ -78,16 +93,26 @@ export const useChatStore = create<ChatState>((set) => ({
     const existingConversation = state.conversations.find((conversation) => conversation.id === id)
 
     if (!existingConversation) {
+      const appended = [...state.conversations, { id, ...partial } as Conversation]
       return {
-        conversations: [{ id, ...partial } as Conversation, ...state.conversations],
+        conversations: sortByMessageActivity(appended),
+      }
+    }
+
+    const mergedConversation = { ...existingConversation, ...partial }
+    const remaining = state.conversations.filter((conversation) => conversation.id !== id)
+
+    // Only reorder by message activity, never by open/select actions.
+    const shouldPrioritize = Boolean(partial.lastMessage?.createdAt)
+
+    if (shouldPrioritize) {
+      return {
+        conversations: sortByMessageActivity([mergedConversation, ...remaining]),
       }
     }
 
     return {
-      conversations: [
-        { ...existingConversation, ...partial },
-        ...state.conversations.filter((conversation) => conversation.id !== id),
-      ],
+      conversations: [mergedConversation, ...remaining],
     }
   }),
   
@@ -222,7 +247,7 @@ export const useChatStore = create<ChatState>((set) => ({
     return { onlineUsers: newSet, conversations: updatedConversations }
   }),
   
-  setUserOffline: (userId) => set((state) => {
+  setUserOffline: (userId, lastSeen = null) => set((state) => {
     const newSet = new Set(state.onlineUsers)
     newSet.delete(userId)
     
@@ -230,7 +255,13 @@ export const useChatStore = create<ChatState>((set) => ({
     const updatedConversations = state.conversations.map(conversation => ({
       ...conversation,
       participants: conversation.participants.map(participant =>
-        participant.id === userId ? { ...participant, status: 'offline' as const } : participant
+        participant.id === userId
+          ? {
+              ...participant,
+              status: 'offline' as const,
+              lastSeen: lastSeen ?? participant.lastSeen,
+            }
+          : participant
       )
     }))
     

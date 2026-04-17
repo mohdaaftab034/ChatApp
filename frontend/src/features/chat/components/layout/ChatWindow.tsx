@@ -8,11 +8,13 @@ import { InputBar } from '../input/InputBar'
 import { useEffect } from 'react'
 import { joinConversation, leaveConversation } from '../../hooks/useSocket'
 import { listMessagesApi } from '../../api/chat.api'
-import { decryptMessageIfNeeded } from '../../../../lib/e2ee'
+import { buildAutoUnlockSecret, decryptMessageIfNeeded, tryAutoUnlockKeyring } from '../../../../lib/e2ee'
 
 export function ChatWindow() {
   const { activeConversationId, setMessages, setConversationUnreadCount } = useChatStore()
   const currentUserId = useAuthStore((state) => state.user?.id)
+  const token = useAuthStore((state) => state.token)
+  const refreshToken = useAuthStore((state) => state.refreshToken)
 
   useEffect(() => {
     if (!activeConversationId) return
@@ -32,6 +34,15 @@ export function ChatWindow() {
 
     ;(async () => {
       try {
+        const autoUnlockSecret = buildAutoUnlockSecret({
+          userId: currentUserId,
+          token,
+          refreshToken,
+        })
+        if (autoUnlockSecret) {
+          await tryAutoUnlockKeyring(autoUnlockSecret)
+        }
+
         const messages = await listMessagesApi(activeConversationId)
         const hydratedMessages = await Promise.all(
           messages.map((message) => decryptMessageIfNeeded(message, currentUserId))
@@ -48,7 +59,7 @@ export function ChatWindow() {
     return () => {
       isMounted = false
     }
-  }, [activeConversationId, currentUserId, setMessages, setConversationUnreadCount])
+  }, [activeConversationId, currentUserId, token, refreshToken, setMessages, setConversationUnreadCount])
 
   if (!activeConversationId) {
     return (

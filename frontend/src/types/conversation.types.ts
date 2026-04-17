@@ -10,6 +10,7 @@ export interface Conversation {
   isPinned: boolean
   isMuted: boolean
   isArchived: boolean
+  isBlocked?: boolean
   createdAt: string
   group?: {
     name: string

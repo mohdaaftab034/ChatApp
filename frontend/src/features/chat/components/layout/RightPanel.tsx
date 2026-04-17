@@ -1,9 +1,13 @@
-import { X, Mail, Phone, MapPin, Briefcase, CalendarDays, Link as LinkIcon, MessageCircle, Search, BellOff, Archive, Trash2, Flag, Ban, Image, FileText, Users, Info, Star } from 'lucide-react'
+import { X, Mail, Phone, MapPin, Briefcase, CalendarDays, Link as LinkIcon, MessageCircle, Search, Archive, Trash2, Flag, Ban, Image, FileText, Users, Info, Star } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { useUIStore } from '../../../../store/uiStore'
 import { useChatStore } from '../../../../store/chatStore'
 import { useAuthStore } from '../../../../store/authStore'
 import { Avatar } from '../../../../components/shared/Avatar'
-import { cn } from '../../../../lib/utils'
+import { cn, normalizeExternalUrl } from '../../../../lib/utils'
+import { toast } from 'sonner'
+import { getMyProfileApi, getProfileByIdApi, type ProfileData } from '../../../profile/api/profile.api'
+import { clearMessagesApi } from '../../api/messages.api'
 
 type ProfileRecord = {
   id: string
@@ -24,6 +28,31 @@ type ProfileRecord = {
     linkedin: string
     x: string
   }
+  isBlocked: boolean
+}
+
+function toProfileRecord(profile: ProfileData): ProfileRecord {
+  return {
+    id: profile.id,
+    name: profile.name,
+    username: profile.username,
+    avatar: profile.avatar,
+    status: profile.status,
+    headline: profile.headline || 'Chat app member',
+    bio: profile.bio || '',
+    email: profile.email || '',
+    phone: profile.phone || '',
+    location: profile.location || '',
+    department: profile.department || '',
+    role: profile.role || 'Member',
+    joinedAt: profile.joinedAt,
+    social: {
+      website: profile.social?.website || '',
+      linkedin: profile.social?.linkedin || '',
+      x: profile.social?.x || '',
+    },
+    isBlocked: Boolean(profile.isBlocked),
+  }
 }
 
 export function RightPanel() {
@@ -37,9 +66,14 @@ export function RightPanel() {
   const openModal = useUIStore((s) => s.openModal)
   const profilePanelConversationId = useUIStore((s) => s.profilePanelConversationId)
   const activeConversationId = useChatStore((s) => s.activeConversationId)
+  const setActiveConversation = useChatStore((s) => s.setActiveConversation)
+  const updateConversation = useChatStore((s) => s.updateConversation)
+  const setMessages = useChatStore((s) => s.setMessages)
   const conversations = useChatStore((s) => s.conversations)
+  const messages = useChatStore((s) => s.messages)
   const currentUser = useAuthStore((s) => s.user)
   const currentUserId = currentUser?.id
+  const [profileDataFromApi, setProfileDataFromApi] = useState<ProfileRecord | null>(null)
 
   const conversationId = profilePanelConversationId ?? activeConversationId
   const conversation = conversations.find((item) => item.id === conversationId)
@@ -47,8 +81,9 @@ export function RightPanel() {
   const isGroupConversation = conversation?.type === 'group'
   const groupSettings = conversation?.group
   const groupMembers = isGroupConversation ? conversation?.participants ?? [] : []
+  const conversationMessages = conversationId ? (messages[conversationId] || []) : []
 
-  const contactProfile: ProfileRecord | null = targetUser
+  const fallbackContactProfile: ProfileRecord | null = targetUser
     ? {
         id: targetUser.id,
         name: targetUser.name,
@@ -56,23 +91,24 @@ export function RightPanel() {
         avatar: targetUser.avatar,
         status: targetUser.status,
         headline: targetUser.bio || 'Team member',
-        bio: targetUser.bio || 'No additional profile details provided.',
+        bio: targetUser.bio || '',
         email: targetUser.email,
-        phone: '+1 555 000 0000',
-        location: 'Unknown',
-        department: 'General',
+        phone: '',
+        location: '',
+        department: '',
         role: 'Member',
-        joinedAt: '2025-01-01',
+        joinedAt: '',
         social: {
-          website: 'https://example.com',
-          linkedin: 'https://linkedin.com',
-          x: 'https://x.com',
+          website: '',
+          linkedin: '',
+          x: '',
         },
+        isBlocked: Boolean(conversation?.isBlocked),
       }
     : null
 
   // Show current user's profile if no conversation is selected
-  const currentUserProfile: ProfileRecord | null = currentUser && !conversation
+  const fallbackCurrentUserProfile: ProfileRecord | null = currentUser && !conversation
     ? {
         id: currentUser.id,
         name: currentUser.name,
@@ -80,22 +116,60 @@ export function RightPanel() {
         avatar: currentUser.avatar,
         status: currentUser.status,
         headline: 'Your Profile',
-        bio: currentUser.bio || 'Welcome to your profile!',
+        bio: currentUser.bio || '',
         email: currentUser.email,
-        phone: '+1 555 000 0000',
-        location: 'Unknown',
-        department: 'General',
+        phone: '',
+        location: '',
+        department: '',
         role: 'Member',
-        joinedAt: '2025-01-01',
+        joinedAt: '',
         social: {
-          website: 'https://example.com',
-          linkedin: 'https://linkedin.com',
-          x: 'https://x.com',
+          website: '',
+          linkedin: '',
+          x: '',
         },
+        isBlocked: false,
       }
     : null
 
-  const profile = contactProfile ?? currentUserProfile
+  useEffect(() => {
+    if (isGroupConversation) {
+      setProfileDataFromApi(null)
+      return
+    }
+
+    const targetProfileId = targetUser?.id || (!conversation && currentUserId ? currentUserId : null)
+    if (!targetProfileId) {
+      setProfileDataFromApi(null)
+      return
+    }
+
+    let isMounted = true
+    ;(async () => {
+      try {
+        const data = targetUser?.id
+          ? await getProfileByIdApi(targetProfileId)
+          : await getMyProfileApi()
+
+        if (!isMounted) return
+        setProfileDataFromApi(toProfileRecord(data))
+      } catch {
+        if (!isMounted) return
+        setProfileDataFromApi(null)
+      }
+    })()
+
+    return () => {
+      isMounted = false
+    }
+  }, [conversation, currentUserId, isGroupConversation, targetUser?.id])
+
+  const profile = profileDataFromApi ?? fallbackContactProfile ?? fallbackCurrentUserProfile
+  const socialLinks = {
+    website: normalizeExternalUrl(profile?.social.website),
+    linkedin: normalizeExternalUrl(profile?.social.linkedin),
+    x: normalizeExternalUrl(profile?.social.x),
+  }
 
   const handleOpenGroupSettings = () => {
     closeRightPanel()
@@ -113,28 +187,160 @@ export function RightPanel() {
     { id: 'search', label: 'Search', icon: Search, tone: 'bg-raised text-foreground' },
   ]
 
-  const profileData = profile as ProfileRecord
+  const profileData = {
+    ...(profile as ProfileRecord),
+    isBlocked: Boolean(conversation?.isBlocked || (profile as ProfileRecord | null)?.isBlocked),
+  }
+  const isProfileOwner = Boolean(currentUserId && profileData.id === currentUserId)
 
   const mediaShortcuts = [
-    { id: 'media', label: 'Media, links, and docs', detail: '132 items', icon: Image },
-    { id: 'files', label: 'Files', detail: '24 documents', icon: FileText },
-    { id: 'groups', label: 'Shared groups', detail: '7 groups in common', icon: Users },
+    {
+      id: 'media',
+      label: 'Media, links, and docs',
+      detail: `${conversationMessages.filter((message) => ['image', 'video', 'link', 'file'].includes(message.type)).length} items`,
+      icon: Image,
+    },
+    {
+      id: 'files',
+      label: 'Files',
+      detail: `${conversationMessages.filter((message) => message.type === 'file').length} documents`,
+      icon: FileText,
+    },
+    {
+      id: 'groups',
+      label: 'Shared groups',
+      detail: `${conversations.filter((item) => item.type === 'group' && targetUser && item.participants.some((participant) => participant.id === targetUser.id)).length} groups in common`,
+      icon: Users,
+    },
   ]
 
-  const safetyActions = [
-    { id: 'mute', label: 'Mute notifications', icon: BellOff },
-    { id: 'star', label: 'Star messages', icon: Star },
-    { id: 'archive', label: 'Archive chat', icon: Archive },
-    { id: 'block', label: 'Block contact', icon: Ban, destructive: true },
-    { id: 'report', label: 'Report contact', icon: Flag, destructive: true },
-    { id: 'delete', label: 'Delete chat', icon: Trash2, destructive: true },
-  ] as const
+  const handleQuickAction = (actionId: string) => {
+    if (!conversationId) return
+
+    if (actionId === 'message') {
+      setActiveConversation(conversationId)
+      handleCloseRightPanel()
+      return
+    }
+
+    if (actionId === 'search') {
+      setActiveConversation(conversationId)
+      handleCloseRightPanel()
+      openModal('search')
+    }
+  }
+
+  const handleSharedContentAction = (actionId: string) => {
+    if (!conversationId) {
+      toast.info('Open a conversation first')
+      return
+    }
+
+    if (actionId === 'media') {
+      const latestVisual = [...conversationMessages]
+        .reverse()
+        .find((message) => (message.type === 'image' || message.type === 'video') && Boolean(message.mediaUrl))
+
+      if (latestVisual?.mediaUrl) {
+        setActiveConversation(conversationId)
+        handleCloseRightPanel()
+        openImageViewer(latestVisual.mediaUrl)
+        return
+      }
+
+      toast.info('No media available yet')
+      return
+    }
+
+    if (actionId === 'files') {
+      const latestFile = [...conversationMessages]
+        .reverse()
+        .find((message) => message.type === 'file' && Boolean(message.mediaUrl))
+
+      if (latestFile?.mediaUrl) {
+        window.open(latestFile.mediaUrl, '_blank', 'noopener,noreferrer')
+        return
+      }
+
+      toast.info('No shared files available yet')
+      return
+    }
+
+    if (actionId === 'groups') {
+      const sharedGroup = conversations.find(
+        (item) => item.type === 'group' && targetUser && item.participants.some((participant) => participant.id === targetUser.id)
+      )
+
+      if (!sharedGroup) {
+        toast.info('No shared groups found')
+        return
+      }
+
+      setActiveConversation(sharedGroup.id)
+      handleCloseRightPanel()
+      return
+    }
+  }
+
+  const safetyActions = isProfileOwner
+    ? []
+    : [
+        { id: 'star', label: 'Star messages', icon: Star },
+        { id: 'archive', label: 'Archive chat', icon: Archive },
+        { id: 'block', label: profileData.isBlocked ? 'Unblock contact' : 'Block contact', icon: Ban, destructive: true },
+        { id: 'report', label: 'Report contact', icon: Flag, destructive: true },
+        { id: 'clear', label: 'Clear messages', icon: Trash2, destructive: true },
+      ] as const
+
+  const handleSafetyAction = async (actionId: string) => {
+    if (!conversationId) {
+      toast.info('Open a conversation first')
+      return
+    }
+
+    if (actionId === 'clear') {
+      try {
+        await clearMessagesApi(conversationId)
+        setMessages(conversationId, [])
+        updateConversation(conversationId, { lastMessage: null, unreadCount: 0 })
+        toast.success('Messages cleared')
+      } catch {
+        // API interceptor already shows error message.
+      }
+      return
+    }
+
+    if (actionId === 'block') {
+      if (!targetUser?.id) {
+        toast.error('No contact selected')
+        return
+      }
+
+      openModal('blockContactConfirm')
+      return
+    }
+
+    if (actionId === 'archive') {
+      updateConversation(conversationId, { isArchived: true })
+      toast.success('Chat archived')
+      return
+    }
+
+    if (actionId === 'star') {
+      toast.info('Starred messages view is coming soon')
+      return
+    }
+
+    if (actionId === 'report') {
+      toast.info('Report flow is coming soon')
+    }
+  }
 
   return (
     <div className="flex h-full w-full flex-col overflow-y-auto bg-surface relative">
       <div className="flex items-center justify-between p-4 border-b border-border sticky top-0 bg-surface z-10">
         <h3 className="font-semibold text-lg text-foreground">Contact Info</h3>
-        <button onClick={() => { clearProfilePanel(); closeRightPanel(); }} className="p-1 hover:bg-raised rounded-lg text-text-secondary hover:text-foreground">
+        <button onClick={handleCloseRightPanel} className="p-1 hover:bg-raised rounded-lg text-text-secondary hover:text-foreground">
           <X size={20} />
         </button>
       </div>
@@ -193,7 +399,7 @@ export function RightPanel() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div className="rounded-xl border border-border bg-surface p-3 space-y-1">
               <p className="text-xs uppercase tracking-wide text-text-secondary">Group Settings</p>
               <p className="text-sm text-foreground">Send messages: {groupSettings.settings?.whoCanSend === 'admins' ? 'Admins only' : 'All members'}</p>
@@ -249,6 +455,7 @@ export function RightPanel() {
               <button
                 key={action.id}
                 type="button"
+                onClick={() => handleSafetyAction(action.id)}
                 className={cn(
                   'w-full flex items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-raised',
                   'destructive' in action && action.destructive ? 'text-destructive' : 'text-foreground'
@@ -296,11 +503,12 @@ export function RightPanel() {
               </div>
             </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-2">
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
               {quickActions.map((action) => (
                 <button
                   key={action.id}
                   type="button"
+                  onClick={() => handleQuickAction(action.id)}
                   className={cn(
                     'inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors',
                     action.tone,
@@ -314,19 +522,51 @@ export function RightPanel() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-xl border border-border bg-surface p-3 space-y-1">
-              <p className="text-xs uppercase tracking-wide text-text-secondary">Contact</p>
-              <p className="text-sm text-foreground inline-flex items-center gap-2"><Mail size={14} />{profileData.email}</p>
-              <p className="text-sm text-foreground inline-flex items-center gap-2"><Phone size={14} />{profileData.phone}</p>
+          {isProfileOwner ? (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="rounded-xl border border-border bg-surface p-3 space-y-1">
+                  <p className="text-xs uppercase tracking-wide text-text-secondary">Contact</p>
+                  <p className="text-sm text-foreground flex items-start gap-2 min-w-0">
+                    <Mail size={14} className="mt-0.5 shrink-0" />
+                    <span className="break-all">{profileData.email || 'Not available'}</span>
+                  </p>
+                  <p className="text-sm text-foreground flex items-start gap-2 min-w-0">
+                    <Phone size={14} className="mt-0.5 shrink-0" />
+                    <span className="break-all">{profileData.phone || 'Not available'}</span>
+                  </p>
+                </div>
+                <div className="rounded-xl border border-border bg-surface p-3 space-y-1">
+                  <p className="text-xs uppercase tracking-wide text-text-secondary">Work</p>
+                  <p className="text-sm text-foreground inline-flex items-center gap-2"><Briefcase size={14} />{profileData.role}</p>
+                  <p className="text-sm text-text-secondary">{profileData.department}</p>
+                  <p className="text-sm text-foreground inline-flex items-center gap-2"><MapPin size={14} />{profileData.location}</p>
+                </div>
+              </div>
+              <div className="rounded-xl border border-border bg-surface p-3 space-y-2">
+                <p className="text-xs uppercase tracking-wide text-text-secondary">Social</p>
+                {profileData.isBlocked ? (
+                  <p className="text-sm text-text-secondary">Social links are hidden for blocked contacts.</p>
+                ) : (
+                  <div className="grid grid-cols-1 xl:grid-cols-3 gap-2">
+                    {socialLinks.website && (
+                      <a href={socialLinks.website} target="_blank" rel="noreferrer" className="text-sm inline-flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-foreground hover:bg-raised transition-colors min-w-0"><LinkIcon size={14} className="shrink-0" /><span className="truncate">Website</span></a>
+                    )}
+                    {socialLinks.linkedin && (
+                      <a href={socialLinks.linkedin} target="_blank" rel="noreferrer" className="text-sm inline-flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-foreground hover:bg-raised transition-colors min-w-0"><LinkIcon size={14} className="shrink-0" /><span className="truncate">LinkedIn</span></a>
+                    )}
+                    {socialLinks.x && (
+                      <a href={socialLinks.x} target="_blank" rel="noreferrer" className="text-sm inline-flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-foreground hover:bg-raised transition-colors min-w-0"><LinkIcon size={14} className="shrink-0" /><span className="truncate">X</span></a>
+                    )}
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="rounded-xl border border-border bg-surface p-3 text-sm text-text-secondary">
+              Private contact and social details are visible only to the profile owner.
             </div>
-            <div className="rounded-xl border border-border bg-surface p-3 space-y-1">
-              <p className="text-xs uppercase tracking-wide text-text-secondary">Work</p>
-              <p className="text-sm text-foreground inline-flex items-center gap-2"><Briefcase size={14} />{profileData.role}</p>
-              <p className="text-sm text-text-secondary">{profileData.department}</p>
-              <p className="text-sm text-foreground inline-flex items-center gap-2"><MapPin size={14} />{profileData.location}</p>
-            </div>
-          </div>
+          )}
 
           <div className="rounded-xl border border-border bg-surface p-3 space-y-3">
             <p className="text-xs uppercase tracking-wide text-text-secondary">Shared content</p>
@@ -334,6 +574,7 @@ export function RightPanel() {
               <button
                 key={item.id}
                 type="button"
+                onClick={() => handleSharedContentAction(item.id)}
                 className="w-full flex items-center justify-between rounded-lg px-2 py-2 hover:bg-raised transition-colors text-left"
               >
                 <div className="flex items-center gap-3 min-w-0">
@@ -350,32 +591,28 @@ export function RightPanel() {
             ))}
           </div>
 
-          <div className="rounded-xl border border-border bg-surface p-3 space-y-1">
-            <p className="text-xs uppercase tracking-wide text-text-secondary">Social</p>
-            <a href={profileData.social.website} target="_blank" rel="noreferrer" className="text-sm inline-flex items-center gap-2 text-foreground hover:text-accent"><LinkIcon size={14} />Website</a>
-            <a href={profileData.social.linkedin} target="_blank" rel="noreferrer" className="text-sm inline-flex items-center gap-2 text-foreground hover:text-accent"><LinkIcon size={14} />LinkedIn</a>
-            <a href={profileData.social.x} target="_blank" rel="noreferrer" className="text-sm inline-flex items-center gap-2 text-foreground hover:text-accent"><LinkIcon size={14} />X</a>
-          </div>
-
-          <div className="rounded-xl border border-border bg-surface divide-y divide-border overflow-hidden">
-            {safetyActions.map((action) => (
-              <button
-                key={action.id}
-                type="button"
-                className={cn(
-                  'w-full flex items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-raised',
-                  'destructive' in action && action.destructive ? 'text-destructive' : 'text-foreground'
-                )}
-              >
-                <action.icon size={16} />
-                <span className="text-sm font-medium">{action.label}</span>
-              </button>
-            ))}
-          </div>
+          {!isProfileOwner && (
+            <div className="rounded-xl border border-border bg-surface divide-y divide-border overflow-hidden">
+              {safetyActions.map((action) => (
+                <button
+                  key={action.id}
+                  type="button"
+                  onClick={() => handleSafetyAction(action.id)}
+                  className={cn(
+                    'w-full flex items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-raised',
+                    'destructive' in action && action.destructive ? 'text-destructive' : 'text-foreground'
+                  )}
+                >
+                  <action.icon size={16} />
+                  <span className="text-sm font-medium">{action.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
 
           <div className="rounded-xl border border-border bg-surface p-3 space-y-1">
             <p className="text-xs uppercase tracking-wide text-text-secondary">Joined</p>
-            <p className="text-sm text-foreground inline-flex items-center gap-2"><CalendarDays size={14} />{profileData.joinedAt}</p>
+            <p className="text-sm text-foreground inline-flex items-center gap-2"><CalendarDays size={14} />{profileData.joinedAt || 'Not available'}</p>
           </div>
         </div>
       )}

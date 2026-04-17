@@ -62,6 +62,13 @@
     --accent-text: #FFFFFF;
     
     --unread-badge: #0A0A0A;
+
+    --message-out-bg: #111827;
+    --message-out-text: #F9FAFB;
+    --message-out-border: #111827;
+    --message-in-bg: #FFFFFF;
+    --message-in-text: #111827;
+    --message-in-border: #E5E7EB;
   }
 
   .dark {
@@ -79,6 +86,13 @@
     --accent-text: #0A0A0A;
     
     --unread-badge: #FFFFFF;
+
+    --message-out-bg: #F3F4F6;
+    --message-out-text: #111827;
+    --message-out-border: #F3F4F6;
+    --message-in-bg: #171A20;
+    --message-in-text: #E5E7EB;
+    --message-in-border: #2F3642;
   }
 
   * {

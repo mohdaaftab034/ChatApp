@@ -6,7 +6,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { getMyProfileApi, getProfileByIdApi, ProfileData, updateMyProfileApi } from '../api/profile.api'
 import { useAuthStore } from '../../../store/authStore'
-import { cn } from '../../../lib/utils'
+import { cn, normalizeExternalUrl } from '../../../lib/utils'
 import { startDirectConversationApi } from '../../contacts/api/contacts.api'
 import { useChatStore } from '../../../store/chatStore'
 
@@ -113,6 +113,11 @@ export default function ProfilePage() {
   }
 
   const isOwnProfile = Boolean(currentUserId && selectedProfile.id === currentUserId)
+  const socialLinks = {
+    website: normalizeExternalUrl(selectedProfile.social.website),
+    linkedin: normalizeExternalUrl(selectedProfile.social.linkedin),
+    x: normalizeExternalUrl(selectedProfile.social.x),
+  }
 
   const openOrCreateDirectConversation = async () => {
     const targetUserId = selectedProfile.id
@@ -141,16 +146,6 @@ export default function ProfilePage() {
     const conversation = await openOrCreateDirectConversation()
     if (!conversation) return
     navigate(`/${conversation.id}`)
-  }
-
-  const handleEmail = () => {
-    const emailValue = String(selectedProfile.email || '').trim()
-    if (!emailValue) {
-      toast.error('No email available for this profile')
-      return
-    }
-
-    window.location.href = `mailto:${emailValue}`
   }
 
   const updateEditField = (field: keyof typeof editForm, value: string) => {
@@ -212,10 +207,10 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="flex h-screen w-full bg-page">
+    <div className="flex min-h-screen w-full bg-page overflow-x-hidden">
       <AppShell>
-        <div className="flex-1 h-full bg-page overflow-y-auto pb-20 md:pb-6">
-          <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
+        <div className="flex-1 h-full min-w-0 bg-page overflow-y-auto pb-20 md:pb-6">
+          <div className="max-w-4xl mx-auto w-full p-4 sm:p-6 lg:p-8">
             <div className="rounded-2xl border border-border bg-surface p-4 sm:p-6 lg:p-8">
               <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
                 <Avatar
@@ -260,14 +255,6 @@ export default function ProfilePage() {
                         <MessageCircle size={14} />
                         {isStartingConversation ? 'Opening...' : 'Message'}
                       </button>
-                      <button
-                        type="button"
-                        onClick={handleEmail}
-                        className="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-raised px-3 py-2 text-xs font-medium text-foreground hover:bg-surface transition-colors disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        <Mail size={14} />
-                        Email
-                      </button>
                     </div>
                   )}
                 </div>
@@ -306,44 +293,64 @@ export default function ProfilePage() {
 
               <p className="mt-6 text-sm sm:text-base text-foreground leading-relaxed">{selectedProfile.bio}</p>
 
-              <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-                <div className="rounded-xl bg-raised border border-border p-3 sm:p-4">
-                  <p className="text-xs uppercase tracking-wide text-text-secondary">Contact</p>
-                  <p className="mt-2 text-sm text-foreground inline-flex items-center gap-2"><Mail size={14} />{selectedProfile.email}</p>
-                  <p className="mt-1 text-sm text-foreground inline-flex items-center gap-2"><Phone size={14} />{selectedProfile.phone}</p>
-                </div>
+              {isOwnProfile ? (
+                <>
+                  <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                    <div className="rounded-xl bg-raised border border-border p-3 sm:p-4">
+                      <p className="text-xs uppercase tracking-wide text-text-secondary">Contact</p>
+                      <p className="mt-2 text-sm text-foreground flex items-start gap-2 min-w-0">
+                        <Mail size={14} className="mt-0.5 shrink-0" />
+                        <span className="break-all">{selectedProfile.email || 'Not available'}</span>
+                      </p>
+                      <p className="mt-1 text-sm text-foreground flex items-start gap-2 min-w-0">
+                        <Phone size={14} className="mt-0.5 shrink-0" />
+                        <span className="break-all">{selectedProfile.phone || 'Not available'}</span>
+                      </p>
+                    </div>
 
-                <div className="rounded-xl bg-raised border border-border p-3 sm:p-4">
-                  <p className="text-xs uppercase tracking-wide text-text-secondary">Work</p>
-                  <p className="mt-2 text-sm text-foreground inline-flex items-center gap-2"><Briefcase size={14} />{selectedProfile.role}</p>
-                  <p className="mt-1 text-sm text-foreground">{selectedProfile.department}</p>
-                </div>
+                    <div className="rounded-xl bg-raised border border-border p-3 sm:p-4">
+                      <p className="text-xs uppercase tracking-wide text-text-secondary">Work</p>
+                      <p className="mt-2 text-sm text-foreground inline-flex items-center gap-2"><Briefcase size={14} />{selectedProfile.role}</p>
+                      <p className="mt-1 text-sm text-foreground">{selectedProfile.department}</p>
+                    </div>
 
-                <div className="rounded-xl bg-raised border border-border p-3 sm:p-4">
-                  <p className="text-xs uppercase tracking-wide text-text-secondary">Location</p>
-                  <p className="mt-2 text-sm text-foreground inline-flex items-center gap-2"><MapPin size={14} />{selectedProfile.location}</p>
-                </div>
+                    <div className="rounded-xl bg-raised border border-border p-3 sm:p-4">
+                      <p className="text-xs uppercase tracking-wide text-text-secondary">Location</p>
+                      <p className="mt-2 text-sm text-foreground inline-flex items-center gap-2"><MapPin size={14} />{selectedProfile.location}</p>
+                    </div>
 
-                <div className="rounded-xl bg-raised border border-border p-3 sm:p-4">
-                  <p className="text-xs uppercase tracking-wide text-text-secondary">Joined</p>
-                  <p className="mt-2 text-sm text-foreground inline-flex items-center gap-2"><CalendarDays size={14} />{selectedProfile.joinedAt}</p>
-                </div>
-              </div>
+                    <div className="rounded-xl bg-raised border border-border p-3 sm:p-4">
+                      <p className="text-xs uppercase tracking-wide text-text-secondary">Joined</p>
+                      <p className="mt-2 text-sm text-foreground inline-flex items-center gap-2"><CalendarDays size={14} />{selectedProfile.joinedAt}</p>
+                    </div>
+                  </div>
 
-              <div className="mt-6 rounded-xl border border-border p-3 sm:p-4">
-                <p className="text-xs uppercase tracking-wide text-text-secondary">Social</p>
-                <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <a href={selectedProfile.social.website} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-foreground hover:bg-raised transition-colors">
-                    <LinkIcon size={14} /> Website
-                  </a>
-                  <a href={selectedProfile.social.linkedin} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-foreground hover:bg-raised transition-colors">
-                    <LinkIcon size={14} /> LinkedIn
-                  </a>
-                  <a href={selectedProfile.social.x} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-foreground hover:bg-raised transition-colors">
-                    <LinkIcon size={14} /> X
-                  </a>
+                  <div className="mt-6 rounded-xl border border-border p-3 sm:p-4">
+                    <p className="text-xs uppercase tracking-wide text-text-secondary">Social</p>
+                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
+                      {socialLinks.website && (
+                        <a href={socialLinks.website} target="_blank" rel="noreferrer" className="inline-flex min-w-0 items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-foreground hover:bg-raised transition-colors">
+                          <LinkIcon size={14} className="shrink-0" /> <span className="truncate">Website</span>
+                        </a>
+                      )}
+                      {socialLinks.linkedin && (
+                        <a href={socialLinks.linkedin} target="_blank" rel="noreferrer" className="inline-flex min-w-0 items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-foreground hover:bg-raised transition-colors">
+                          <LinkIcon size={14} className="shrink-0" /> <span className="truncate">LinkedIn</span>
+                        </a>
+                      )}
+                      {socialLinks.x && (
+                        <a href={socialLinks.x} target="_blank" rel="noreferrer" className="inline-flex min-w-0 items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-foreground hover:bg-raised transition-colors">
+                          <LinkIcon size={14} className="shrink-0" /> <span className="truncate">X</span>
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="mt-6 rounded-xl border border-border bg-raised p-4 text-sm text-text-secondary">
+                  Private details are visible only to the profile owner.
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>

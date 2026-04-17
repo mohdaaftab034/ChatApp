@@ -2,6 +2,9 @@ const crypto = require('crypto')
 const Message = require('../../models/Message.model')
 const Conversation = require('../../models/Conversation.model')
 const User = require('../../models/User.model')
+const { getBlockState } = require('../../utils/blocking')
+const Contact = require('../../models/Contact.model')
+const { DEFAULT_PRIVACY_SETTINGS } = require('../privacy/privacy.service')
 
 function newId(prefix) {
   return `${prefix}-${crypto.randomUUID()}`
@@ -82,15 +85,21 @@ function withClientTempId(messagePayload, clientTempId) {
   }
 }
 
-function toParticipant(userDoc) {
+function canViewerSeeBySetting(privacyValue, isContact) {
+  if (privacyValue === 'nobody') return false
+  if (privacyValue === 'contacts') return isContact
+  return true
+}
+
+function toParticipant(userDoc, { canSeeLastSeen, canSeeProfilePhoto }) {
   return {
     id: userDoc._id.toString(),
     name: userDoc.name,
     username: userDoc.username || '',
     email: userDoc.email,
-    avatar: userDoc.avatar,
+    avatar: canSeeProfilePhoto ? userDoc.avatar : null,
     status: userDoc.status,
-    lastSeen: userDoc.lastSeen,
+    lastSeen: canSeeLastSeen ? userDoc.lastSeen : null,
     bio: userDoc.bio || '',
     isVerified: userDoc.isVerified,
   }
@@ -98,12 +107,51 @@ function toParticipant(userDoc) {
 
 async function toConversationPayload(conversationDoc, userId) {
   const participantIds = conversationDoc.participantIds || []
+  const userIdStr = String(userId)
   const users = await User.find({ _id: { $in: participantIds } })
-    .select('_id name username email avatar status lastSeen bio isVerified')
+    .select('_id name username email avatar status lastSeen bio isVerified privacy')
     .lean()
 
-  const participantMap = new Map(users.map((user) => [user._id.toString(), toParticipant(user)]))
+  const visibilityRows = await Contact.find({
+    userId: { $in: participantIds.map((id) => String(id)) },
+    contactId: userIdStr,
+  }).select('userId').lean()
+  const targetHasViewerAsContact = new Set(visibilityRows.map((entry) => String(entry.userId)))
+
+  const participantMap = new Map(
+    users.map((participant) => {
+      const participantId = String(participant._id)
+      const isSelf = participantId === userIdStr
+      const isContact = targetHasViewerAsContact.has(participantId)
+      const privacy = participant.privacy || DEFAULT_PRIVACY_SETTINGS
+
+      const canSeeLastSeen = isSelf
+        ? true
+        : canViewerSeeBySetting(privacy.lastSeen, isContact)
+
+      const canSeeProfilePhoto = isSelf
+        ? true
+        : canViewerSeeBySetting(privacy.profilePhoto, isContact)
+
+      return [
+        participantId,
+        toParticipant(participant, {
+          canSeeLastSeen,
+          canSeeProfilePhoto,
+        }),
+      ]
+    })
+  )
   const participants = participantIds.map((id) => participantMap.get(id)).filter(Boolean)
+  let isBlocked = false
+
+  if (conversationDoc.type === 'direct') {
+    const otherParticipantId = participantIds.find((id) => id !== userId)
+    if (otherParticipantId) {
+      const blockState = await getBlockState(userId, otherParticipantId)
+      isBlocked = blockState.isBlocked
+    }
+  }
 
   return {
     id: conversationDoc._id,
@@ -114,6 +162,7 @@ async function toConversationPayload(conversationDoc, userId) {
     isPinned: Boolean(conversationDoc.isPinned),
     isMuted: Boolean(conversationDoc.isMuted),
     isArchived: Boolean(conversationDoc.isArchived),
+    isBlocked,
     createdAt: conversationDoc.createdAt,
     group: conversationDoc.group || undefined,
   }
@@ -219,6 +268,18 @@ async function sendMessage({ senderId, conversationId, type, text, mediaUrl, fil
   const now = new Date()
   const existingConversation = await Conversation.findById(conversationId).lean()
 
+  if (!existingConversation) {
+    const directRecipientIds = [...new Set((participantIds || []).filter((id) => id && id !== senderId))]
+    if (directRecipientIds.length === 1) {
+      const blockState = await getBlockState(senderId, directRecipientIds[0])
+      if (blockState.isBlocked) {
+        const error = new Error('You cannot send messages in this chat')
+        error.statusCode = 403
+        throw error
+      }
+    }
+  }
+
   if (existingConversation) {
     const participantSet = new Set(existingConversation.participantIds || [])
     if (!participantSet.has(senderId)) {
@@ -233,6 +294,18 @@ async function sendMessage({ senderId, conversationId, type, text, mediaUrl, fil
         const error = new Error('Only group admins can send messages')
         error.statusCode = 403
         throw error
+      }
+    }
+
+    if (existingConversation.type === 'direct') {
+      const otherParticipantId = (existingConversation.participantIds || []).find((id) => id !== senderId)
+      if (otherParticipantId) {
+        const blockState = await getBlockState(senderId, otherParticipantId)
+        if (blockState.isBlocked) {
+          const error = new Error('You cannot send messages in this chat')
+          error.statusCode = 403
+          throw error
+        }
       }
     }
   }
@@ -522,6 +595,55 @@ async function deleteMessage({ actorId, messageId }) {
   }
 }
 
+async function clearConversationMessages({ actorId, conversationId }) {
+  if (!conversationId) {
+    const error = new Error('conversationId is required')
+    error.statusCode = 400
+    throw error
+  }
+
+  const conversation = await Conversation.findById(conversationId)
+  if (!conversation) {
+    const error = new Error('Conversation not found')
+    error.statusCode = 404
+    throw error
+  }
+
+  if (!(conversation.participantIds || []).includes(actorId)) {
+    const error = new Error('You are not a member of this conversation')
+    error.statusCode = 403
+    throw error
+  }
+
+  const clearedResult = await Message.updateMany(
+    { conversationId, isDeleted: false },
+    {
+      $set: {
+        isDeleted: true,
+        text: 'Message deleted',
+        mediaUrl: null,
+        fileName: null,
+        fileSize: null,
+        audioDuration: null,
+        location: null,
+        linkPreview: null,
+        sharedContact: null,
+        encryptedPayload: null,
+      },
+    }
+  )
+
+  conversation.lastMessage = null
+  await conversation.save()
+
+  return {
+    conversationId,
+    clearedCount: Number(clearedResult.modifiedCount || 0),
+    conversation: await toConversationPayload(conversation.toObject(), actorId),
+    participantIds: conversation.participantIds || [],
+  }
+}
+
 async function markDeliveredForUser({ userId }) {
   const conversations = await Conversation.find({ participantIds: userId }).select('_id').lean()
   const conversationIds = conversations.map((conversation) => conversation._id)
@@ -559,5 +681,6 @@ module.exports = {
   searchMessages,
   markRead,
   deleteMessage,
+  clearConversationMessages,
   markDeliveredForUser,
 }

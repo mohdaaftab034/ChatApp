@@ -53,6 +53,7 @@ export interface ServerToClientEvents {
   typing_stop: (data: { userId: string; conversationId: string }) => void
   messages_read: (data: { messageIds: string[]; readerId: string; conversationId: string }) => void
   conversation_updated: (conversation: Conversation) => void
+  messages_cleared: (data: { conversationId: string }) => void
 }
 
 

@@ -2,6 +2,7 @@ const roomNames = require('../rooms')
 const User = require('../../models/User.model')
 const Conversation = require('../../models/Conversation.model')
 const messageService = require('../../modules/message/message.service')
+const Contact = require('../../models/Contact.model')
 
 function getConnectedUserIds(io) {
   const userIds = new Set()
@@ -70,10 +71,34 @@ async function attachPresenceHandlers(io, socket) {
       }
     )
 
-    io.emit('user_offline', {
-      userId: String(userId),
+    const offlineUser = await User.findById(userId).select('privacy').lean()
+    const lastSeenPrivacy = offlineUser?.privacy?.lastSeen || 'contacts'
+    const payloadBase = { userId: String(userId) }
+    const payloadWithLastSeen = {
+      ...payloadBase,
       lastSeen: lastSeen.toISOString(),
-    })
+    }
+
+    if (lastSeenPrivacy === 'everyone') {
+      io.emit('user_offline', payloadWithLastSeen)
+      return
+    }
+
+    if (lastSeenPrivacy === 'nobody') {
+      io.emit('user_offline', payloadBase)
+      return
+    }
+
+    const contacts = await Contact.find({ userId: String(userId) }).select('contactId').lean()
+    const contactIds = new Set(contacts.map((entry) => String(entry.contactId)))
+
+    for (const clientSocket of io.of('/').sockets.values()) {
+      const viewerId = String(clientSocket.data?.userId || '')
+      if (!viewerId) continue
+
+      const isAllowedViewer = viewerId === String(userId) || contactIds.has(viewerId)
+      clientSocket.emit('user_offline', isAllowedViewer ? payloadWithLastSeen : payloadBase)
+    }
   })
 }
 

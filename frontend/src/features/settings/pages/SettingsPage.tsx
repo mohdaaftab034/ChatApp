@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AppShell } from '../../chat/components/layout/AppShell'
-import { User, Shield, Bell, Palette, MonitorSmartphone, LogOut, Menu, X, ChevronRight, ArrowLeft } from 'lucide-react'
+import { User, Shield, Bell, Palette, LogOut, Menu, X, ChevronRight, ArrowLeft } from 'lucide-react'
 import { cn } from '../../../lib/utils'
 import { useUIStore } from '../../../store/uiStore'
 import { useAuthStore } from '../../../store/authStore'
@@ -14,10 +14,6 @@ export default function SettingsPage() {
   const logout = useAuthStore((state) => state.logout)
   const updateUser = useAuthStore((state) => state.updateUser)
   const navigate = useNavigate()
-  const theme = useUIStore((state) => state.theme)
-  const setTheme = useUIStore((state) => state.setTheme)
-  const accentColor = useUIStore((state) => state.accentColor)
-  const setAccentColor = useUIStore((state) => state.setAccentColor)
   const isMobileSidebarOpen = useUIStore((state) => state.isMobileSidebarOpen)
   const toggleMobileSidebar = useUIStore((state) => state.toggleMobileSidebar)
 
@@ -361,81 +357,21 @@ export default function SettingsPage() {
           </div>
         )
       case 'theme': {
-        const themeModes: Array<{ id: 'light' | 'dark' | 'system'; label: string; hint: string }> = [
-          { id: 'light', label: 'Light', hint: 'Always use light mode' },
-          { id: 'dark', label: 'Dark', hint: 'Always use dark mode' },
-          { id: 'system', label: 'System', hint: 'Follow device appearance' },
-        ]
-
-        const colorChoices: Array<{ id: 'mono' | 'ocean' | 'coral' | 'forest' | 'gold'; label: string; swatch: string }> = [
-          { id: 'mono', label: 'Monochrome', swatch: '#0A0A0A' },
-          { id: 'ocean', label: 'Ocean', swatch: '#0A84FF' },
-          { id: 'coral', label: 'Coral', swatch: '#E6554F' },
-          { id: 'forest', label: 'Forest', swatch: '#2E7D32' },
-          { id: 'gold', label: 'Gold', swatch: '#C69214' },
-        ]
-
         return (
           <div className="space-y-6 animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center gap-2 text-foreground">
-              <MonitorSmartphone size={18} />
-              <h2 className="text-xl font-semibold">Theme & Colors</h2>
-            </div>
-
-            <div className="space-y-3">
-              <p className="text-sm font-medium text-foreground">Appearance Mode</p>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {themeModes.map((mode) => (
-                  <button
-                    key={mode.id}
-                    onClick={() => setTheme(mode.id)}
-                    className={cn(
-                      'rounded-xl border p-4 text-left transition-colors',
-                      theme === mode.id
-                        ? 'border-foreground bg-raised text-foreground'
-                        : 'border-border bg-surface hover:bg-raised text-text-secondary hover:text-foreground'
-                    )}
-                  >
-                    <p className="text-sm font-semibold">{mode.label}</p>
-                    <p className="mt-1 text-xs">{mode.hint}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <p className="text-sm font-medium text-foreground">Accent Color</p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-                {colorChoices.map((choice) => (
-                  <button
-                    key={choice.id}
-                    onClick={() => setAccentColor(choice.id)}
-                    className={cn(
-                      'rounded-xl border px-3 py-3 text-left transition-colors',
-                      accentColor === choice.id
-                        ? 'border-foreground bg-raised'
-                        : 'border-border bg-surface hover:bg-raised'
-                    )}
-                  >
-                    <span
-                      className="mb-2 block h-6 w-full rounded-md border border-border"
-                      style={{ backgroundColor: choice.swatch }}
-                    />
-                    <span className="text-xs font-medium text-foreground">{choice.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-border bg-surface p-4">
-              <p className="text-xs uppercase tracking-wide text-text-secondary">Preview</p>
-              <div className="mt-3 rounded-xl border border-border bg-page p-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-foreground">Sample conversation</p>
-                  <span className="rounded-full bg-accent px-2 py-0.5 text-xs text-accent-foreground">3 new</span>
-                </div>
-                <p className="mt-2 text-sm text-text-secondary">This preview updates with your selected mode and accent.</p>
-              </div>
+            <h2 className="text-xl font-semibold text-foreground">Theme & Colors</h2>
+            <div className="bg-surface rounded-xl border border-border divide-y divide-border overflow-hidden">
+              <button
+                type="button"
+                onClick={() => navigate('/settings/theme')}
+                className="w-full p-4 flex justify-between items-center hover:bg-raised transition-colors"
+              >
+                <span className="text-sm font-medium text-foreground">Theme style</span>
+                <span className="inline-flex items-center gap-2 text-sm text-text-secondary">
+                  Open theme settings
+                  <ChevronRight size={16} />
+                </span>
+              </button>
             </div>
           </div>
         )

@@ -10,6 +10,7 @@ import { GlobalSearch } from '../../../search/components/GlobalSearch'
 import { CreateGroupWizard } from '../../../groups/components/CreateGroupWizard'
 import { GroupSettingsModal } from '../../../groups/components/GroupSettingsModal'
 import { Lightbox } from './Lightbox'
+import { BlockContactModal } from './BlockContactModal'
 // Import NewChatModal here too once created
 
 interface AppShellProps {
@@ -86,6 +87,7 @@ export function AppShell({ children }: AppShellProps) {
       {activeModal === 'createGroup' && <CreateGroupWizard />}
       {activeModal === 'groupSettings' && <GroupSettingsModal />}
       {activeModal === 'imageViewer' && <Lightbox />}
+      {activeModal === 'blockContactConfirm' && <BlockContactModal />}
       
       {/* Mobile nav placeholder - To be fully implemented with Sheet/Drawer mechanisms */}
       {!(activeConversationId && !children) && (

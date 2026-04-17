@@ -1,7 +1,9 @@
 import type { Message } from '../types/message.types'
 
 const KEYRING_STORAGE_KEY = 'chatapp_e2ee_keyring_v1'
+const AUTO_UNLOCK_STORAGE_KEY = 'chatapp_e2ee_autounlock_v1'
 const PBKDF2_ITERATIONS = 210000
+const AUTO_UNLOCK_PBKDF2_ITERATIONS = 140000
 const AES_GCM_IV_BYTES = 12
 
 type StoredKeyRecord = {
@@ -19,6 +21,18 @@ type StoredKeyring = {
   version: 1
   activeKeyId: string | null
   keys: StoredKeyRecord[]
+}
+
+type AutoUnlockRecord = {
+  keyId: string
+  salt: string
+  iv: string
+  ciphertext: string
+}
+
+type StoredAutoUnlockBundle = {
+  version: 1
+  records: AutoUnlockRecord[]
 }
 
 export type PublicKeyPayload = {
@@ -40,6 +54,7 @@ type UnlockedKey = {
 }
 
 let unlockedKeys: UnlockedKey[] = []
+let unlockedKeyMaterial = new Map<string, string>()
 const publicKeyCache = new Map<string, string>()
 
 function textEncoder() {
@@ -139,6 +154,29 @@ async function derivePasswordKey(password: string, salt: Uint8Array) {
   )
 }
 
+async function deriveAutoUnlockKey(secret: string, salt: Uint8Array) {
+  const baseKey = await crypto.subtle.importKey(
+    'raw',
+    textEncoder().encode(secret),
+    'PBKDF2',
+    false,
+    ['deriveKey']
+  )
+
+  return crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: toStrictBytes(salt),
+      iterations: AUTO_UNLOCK_PBKDF2_ITERATIONS,
+      hash: 'SHA-256',
+    },
+    baseKey,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  )
+}
+
 async function generateAsymmetricKeyPair() {
   const pair = await crypto.subtle.generateKey(
     {
@@ -217,6 +255,26 @@ function getActiveRecord(keyring: StoredKeyring) {
   return keyring.keys.find((key) => key.keyId === keyring.activeKeyId) || null
 }
 
+function loadAutoUnlockBundle(): StoredAutoUnlockBundle | null {
+  const raw = localStorage.getItem(AUTO_UNLOCK_STORAGE_KEY)
+  if (!raw) return null
+
+  try {
+    const parsed = JSON.parse(raw) as StoredAutoUnlockBundle
+    if (!Array.isArray(parsed.records)) return null
+    return {
+      version: 1,
+      records: parsed.records,
+    }
+  } catch {
+    return null
+  }
+}
+
+function saveAutoUnlockBundle(bundle: StoredAutoUnlockBundle) {
+  localStorage.setItem(AUTO_UNLOCK_STORAGE_KEY, JSON.stringify(bundle))
+}
+
 async function createAndStoreKey(password: string, keyring: StoredKeyring) {
   const generated = await generateAsymmetricKeyPair()
   const keyId = `key-${crypto.randomUUID()}`
@@ -246,11 +304,13 @@ export async function unlockOrCreateKeyring(password: string) {
   }
 
   const nextUnlocked: UnlockedKey[] = []
+  const nextUnlockedMaterial = new Map<string, string>()
   for (const key of keyring.keys) {
     try {
       const privateKeyBase64 = await decryptPrivateKey(key.encryptedPrivateKey, password)
       const privateKey = await importPrivateKey(privateKeyBase64)
       nextUnlocked.push({ keyId: key.keyId, privateKey })
+      nextUnlockedMaterial.set(key.keyId, privateKeyBase64)
     } catch {
       // Keep going so old keys with stale password data do not block login.
     }
@@ -261,6 +321,7 @@ export async function unlockOrCreateKeyring(password: string) {
   }
 
   unlockedKeys = nextUnlocked
+  unlockedKeyMaterial = nextUnlockedMaterial
 
   const activeRecord = getActiveRecord(keyring)
   if (!activeRecord) {
@@ -268,6 +329,7 @@ export async function unlockOrCreateKeyring(password: string) {
     const privateKeyBase64 = await decryptPrivateKey(created.encryptedPrivateKey, password)
     const privateKey = await importPrivateKey(privateKeyBase64)
     unlockedKeys.push({ keyId: created.keyId, privateKey })
+    unlockedKeyMaterial.set(created.keyId, privateKeyBase64)
     return {
       keyId: created.keyId,
       publicKey: created.publicKey,
@@ -312,6 +374,7 @@ export async function maybeRotateKeyPair(password: string, maxAgeDays = 30) {
   const privateKey = await importPrivateKey(privateKeyBase64)
 
   unlockedKeys = [{ keyId: created.keyId, privateKey }, ...unlockedKeys]
+  unlockedKeyMaterial.set(created.keyId, privateKeyBase64)
 
   return {
     keyId: created.keyId,
@@ -337,6 +400,93 @@ export function getCurrentPublicKey() {
 
 export function clearUnlockedKeys() {
   unlockedKeys = []
+  unlockedKeyMaterial = new Map<string, string>()
+  localStorage.removeItem(AUTO_UNLOCK_STORAGE_KEY)
+}
+
+export function buildAutoUnlockSecret(params: {
+  userId?: string | null
+  token?: string | null
+  refreshToken?: string | null
+}) {
+  const userId = String(params.userId || '').trim()
+
+  if (!userId) {
+    return null
+  }
+
+  // Keep the secret stable for this signed-in user so token/refresh rotations
+  // do not invalidate auto-unlock snapshots between API refresh cycles.
+  return `chatapp-autounlock::${userId}`
+}
+
+export async function cacheAutoUnlockSnapshot(secret: string) {
+  const trimmedSecret = String(secret || '').trim()
+  if (!trimmedSecret || unlockedKeyMaterial.size === 0) {
+    return
+  }
+
+  const records: AutoUnlockRecord[] = []
+  for (const [keyId, privateKeyBase64] of unlockedKeyMaterial.entries()) {
+    const salt = randomBytes(16)
+    const iv = randomBytes(AES_GCM_IV_BYTES)
+    const sessionKey = await deriveAutoUnlockKey(trimmedSecret, salt)
+    const ciphertext = await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv: toStrictBytes(iv) },
+      sessionKey,
+      fromBase64(privateKeyBase64)
+    )
+
+    records.push({
+      keyId,
+      salt: toBase64(salt.buffer),
+      iv: toBase64(iv.buffer),
+      ciphertext: toBase64(ciphertext),
+    })
+  }
+
+  saveAutoUnlockBundle({ version: 1, records })
+}
+
+export async function tryAutoUnlockKeyring(secret: string) {
+  const trimmedSecret = String(secret || '').trim()
+  if (!trimmedSecret) return false
+
+  const bundle = loadAutoUnlockBundle()
+  if (!bundle || !bundle.records.length) return false
+
+  const nextUnlocked: UnlockedKey[] = []
+  const nextUnlockedMaterial = new Map<string, string>()
+
+  for (const record of bundle.records) {
+    try {
+      const salt = new Uint8Array(fromBase64(record.salt))
+      const iv = new Uint8Array(fromBase64(record.iv))
+      const encryptedBytes = fromBase64(record.ciphertext)
+
+      const sessionKey = await deriveAutoUnlockKey(trimmedSecret, salt)
+      const privateKeyBuffer = await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: toStrictBytes(iv) },
+        sessionKey,
+        encryptedBytes
+      )
+
+      const privateKeyBase64 = toBase64(privateKeyBuffer)
+      const privateKey = await importPrivateKey(privateKeyBase64)
+      nextUnlocked.push({ keyId: record.keyId, privateKey })
+      nextUnlockedMaterial.set(record.keyId, privateKeyBase64)
+    } catch {
+      // Ignore keys that cannot be restored from this session secret.
+    }
+  }
+
+  if (!nextUnlocked.length) {
+    return false
+  }
+
+  unlockedKeys = nextUnlocked
+  unlockedKeyMaterial = nextUnlockedMaterial
+  return true
 }
 
 export async function encryptPlaintextForUsers(

@@ -70,6 +70,32 @@ async function markRead(req, res, next) {
   }
 }
 
+async function clear(req, res, next) {
+  try {
+    const data = await messageService.clearConversationMessages({
+      actorId: req.user.sub,
+      conversationId: req.validated.body.conversationId,
+    })
+
+    const io = getIO()
+    if (io && data.participantIds) {
+      for (const participantId of data.participantIds) {
+        io.to(roomNames.user(participantId)).emit('messages_cleared', {
+          conversationId: data.conversationId,
+        })
+
+        if (data.conversation) {
+          io.to(roomNames.user(participantId)).emit('conversation_updated', data.conversation)
+        }
+      }
+    }
+
+    return res.status(200).json(formatResponse({ data, message: 'Messages cleared' }))
+  } catch (error) {
+    return next(error)
+  }
+}
+
 async function remove(req, res, next) {
   try {
     const data = await messageService.deleteMessage({
@@ -97,4 +123,4 @@ async function remove(req, res, next) {
   }
 }
 
-module.exports = { list, search, create, markRead, remove }
+module.exports = { list, search, create, markRead, clear, remove }

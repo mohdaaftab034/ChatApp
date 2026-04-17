@@ -18,6 +18,7 @@ const contactRoutes = require('./modules/contact/contact.routes')
 const notificationRoutes = require('./modules/notification/notification.routes')
 const mediaRoutes = require('./modules/media/media.routes')
 const searchRoutes = require('./modules/search/search.routes')
+const privacyRoutes = require('./modules/privacy/privacy.routes')
 
 const app = express()
 
@@ -55,6 +56,7 @@ app.get('/health', (_req, res) => {
 app.use(apiLimiter)
 app.use(`${env.API_PREFIX}/auth`, authLimiter, authRoutes)
 app.use(`${env.API_PREFIX}/users`, userRoutes)
+app.use(`${env.API_PREFIX}/privacy`, privacyRoutes)
 app.use(`${env.API_PREFIX}/conversations`, conversationRoutes)
 app.use(`${env.API_PREFIX}/messages`, messageRoutes)
 app.use(`${env.API_PREFIX}/groups`, groupRoutes)

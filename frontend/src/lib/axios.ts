@@ -27,6 +27,10 @@ api.interceptors.response.use(
 
       try {
         const refreshToken = useAuthStore.getState().refreshToken
+        if (!refreshToken) {
+          throw new Error('Missing refresh token')
+        }
+
         const res = await axios.post(`${api.defaults.baseURL}/auth/refresh`, { refreshToken })
         
         const authData = res.data?.data
@@ -39,7 +43,9 @@ api.interceptors.response.use(
         return api(originalRequest)
       } catch (refreshError) {
         useAuthStore.getState().logout()
-        window.location.href = '/login'
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login'
+        }
         return Promise.reject(refreshError)
       }
     }

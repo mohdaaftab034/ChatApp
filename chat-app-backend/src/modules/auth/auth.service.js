@@ -129,6 +129,12 @@ async function resetPassword({ email, otp, password }) {
 }
 
 async function refreshToken({ refreshToken }) {
+  if (!refreshToken) {
+    const error = new Error('Refresh token is required')
+    error.statusCode = 401
+    throw error
+  }
+
   const payload = verifyRefreshToken(refreshToken)
 
   const redis = getRedis()

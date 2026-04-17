@@ -2,16 +2,24 @@ const crypto = require('crypto')
 const Conversation = require('../../models/Conversation.model')
 const User = require('../../models/User.model')
 const cloudinary = require('../../config/cloudinary')
+const Contact = require('../../models/Contact.model')
+const { DEFAULT_PRIVACY_SETTINGS } = require('../privacy/privacy.service')
 
-function toParticipant(userDoc) {
+function canViewerSeeBySetting(privacyValue, isContact) {
+  if (privacyValue === 'nobody') return false
+  if (privacyValue === 'contacts') return isContact
+  return true
+}
+
+function toParticipant(userDoc, { canSeeLastSeen, canSeeProfilePhoto }) {
   return {
     id: userDoc._id.toString(),
     name: userDoc.name,
     username: userDoc.username || '',
     email: userDoc.email,
-    avatar: userDoc.avatar,
+    avatar: canSeeProfilePhoto ? userDoc.avatar : null,
     status: userDoc.status,
-    lastSeen: userDoc.lastSeen,
+    lastSeen: canSeeLastSeen ? userDoc.lastSeen : null,
     bio: userDoc.bio || '',
     isVerified: userDoc.isVerified,
   }
@@ -34,11 +42,42 @@ function toConversationPayload(conversation, userId, participantMap) {
 
 async function hydrate(conversations, userId) {
   const participantIds = [...new Set(conversations.flatMap((conversation) => conversation.participantIds || []))]
+  const userIdStr = String(userId)
   const users = await User.find({ _id: { $in: participantIds } })
-    .select('_id name username email avatar status lastSeen bio isVerified')
+    .select('_id name username email avatar status lastSeen bio isVerified privacy')
     .lean()
 
-  const participantMap = new Map(users.map((user) => [user._id.toString(), toParticipant(user)]))
+  const visibilityRows = await Contact.find({
+    userId: { $in: participantIds.map((id) => String(id)) },
+    contactId: userIdStr,
+  }).select('userId').lean()
+  const targetHasViewerAsContact = new Set(visibilityRows.map((entry) => String(entry.userId)))
+
+  const participantMap = new Map(
+    users.map((participant) => {
+      const participantId = String(participant._id)
+      const isSelf = participantId === userIdStr
+      const isContact = targetHasViewerAsContact.has(participantId)
+      const privacy = participant.privacy || DEFAULT_PRIVACY_SETTINGS
+
+      const canSeeLastSeen = isSelf
+        ? true
+        : canViewerSeeBySetting(privacy.lastSeen, isContact)
+
+      const canSeeProfilePhoto = isSelf
+        ? true
+        : canViewerSeeBySetting(privacy.profilePhoto, isContact)
+
+      return [
+        participantId,
+        toParticipant(participant, {
+          canSeeLastSeen,
+          canSeeProfilePhoto,
+        }),
+      ]
+    })
+  )
+
   return conversations.map((conversation) => toConversationPayload(conversation, userId, participantMap))
 }
 

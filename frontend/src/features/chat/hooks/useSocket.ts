@@ -4,7 +4,7 @@ import { useChatStore } from '../../../store/chatStore'
 import { useSocketStore } from '../../../store/socketStore'
 import { SendMessagePayload } from '../../../types/socket.types'
 import { useAuthStore } from '../../../store/authStore'
-import { decryptMessageIfNeeded } from '../../../lib/e2ee'
+import { buildAutoUnlockSecret, decryptMessageIfNeeded, tryAutoUnlockKeyring } from '../../../lib/e2ee'
 
 export function useSocketSetup() {
   const {
@@ -20,6 +20,7 @@ export function useSocketSetup() {
     updateConversation,
     markMessagesRead,
     setConversationUnreadCount,
+    setMessages,
   } = useChatStore()
   const token = useAuthStore((s) => s.token)
   const currentUserId = useAuthStore((s) => s.user?.id)
@@ -43,6 +44,17 @@ export function useSocketSetup() {
     }
 
     const onReceiveMessage = async (incomingMessage: Parameters<typeof addMessage>[1]) => {
+      const authState = useAuthStore.getState()
+      const autoUnlockSecret = buildAutoUnlockSecret({
+        userId: authState.user?.id,
+        token: authState.token,
+        refreshToken: authState.refreshToken,
+      })
+
+      if (autoUnlockSecret) {
+        await tryAutoUnlockKeyring(autoUnlockSecret)
+      }
+
       const message = await decryptMessageIfNeeded(incomingMessage, currentUserId)
       const conversationMessages = useChatStore.getState().messages[message.conversationId] || []
 
@@ -62,22 +74,13 @@ export function useSocketSetup() {
           isUploading: false,
         })
         updateConversation(message.conversationId, { lastMessage: message })
-
-        if (
-          message.senderId === currentUserId
-          || pendingUploadingMessage.senderId === currentUserId
-          || pendingUploadingMessage.senderId === 'me'
-        ) {
-          bumpConversationToTop(message.conversationId, { lastMessage: message })
-        }
+        bumpConversationToTop(message.conversationId, { lastMessage: message })
       } else {
         if (!messageAlreadyExists) {
           addMessage(message.conversationId, message)
         }
         updateConversation(message.conversationId, { lastMessage: message })
-        if (message.senderId === currentUserId) {
-          bumpConversationToTop(message.conversationId, { lastMessage: message })
-        }
+        bumpConversationToTop(message.conversationId, { lastMessage: message })
       }
     }
 
@@ -97,8 +100,8 @@ export function useSocketSetup() {
       setOnlineUsers(userIds.map((id) => String(id)))
     }
 
-    const onUserOffline = (data: { userId: string }) => {
-      setUserOffline(String(data.userId))
+    const onUserOffline = (data: { userId: string; lastSeen?: string | null }) => {
+      setUserOffline(String(data.userId), data.lastSeen ?? null)
     }
 
     const onTypingStart = (data: { conversationId: string; userId: string }) => {
@@ -117,8 +120,37 @@ export function useSocketSetup() {
       }
     }
 
-    const onConversationUpdated = (conversation: { id: string }) => {
-      updateConversation(conversation.id, conversation)
+    const onConversationUpdated = async (conversation: { id: string; lastMessage?: Parameters<typeof addMessage>[1] | null }) => {
+      const authState = useAuthStore.getState()
+      const autoUnlockSecret = buildAutoUnlockSecret({
+        userId: authState.user?.id,
+        token: authState.token,
+        refreshToken: authState.refreshToken,
+      })
+
+      if (autoUnlockSecret) {
+        await tryAutoUnlockKeyring(autoUnlockSecret)
+      }
+
+      if (!conversation.lastMessage) {
+        updateConversation(conversation.id, conversation)
+        return
+      }
+
+      const decryptedLastMessage = await decryptMessageIfNeeded(conversation.lastMessage, currentUserId)
+      updateConversation(conversation.id, {
+        ...conversation,
+        lastMessage: decryptedLastMessage,
+      })
+      bumpConversationToTop(conversation.id, {
+        ...conversation,
+        lastMessage: decryptedLastMessage,
+      })
+    }
+
+    const onMessagesCleared = (data: { conversationId: string }) => {
+      setMessages(data.conversationId, [])
+      updateConversation(data.conversationId, { lastMessage: null, unreadCount: 0 })
     }
 
     const onConnectError = () => {
@@ -137,6 +169,7 @@ export function useSocketSetup() {
     socket.on('typing_stop', onTypingStop)
     socket.on('messages_read', onMessagesRead)
     socket.on('conversation_updated', onConversationUpdated)
+    socket.on('messages_cleared', onMessagesCleared)
     socket.on('connect_error', onConnectError)
 
     socket.auth = { token }
@@ -155,11 +188,12 @@ export function useSocketSetup() {
       socket.off('typing_stop', onTypingStop)
       socket.off('messages_read', onMessagesRead)
       socket.off('conversation_updated', onConversationUpdated)
+      socket.off('messages_cleared', onMessagesCleared)
       socket.off('connect_error', onConnectError)
     }
   }, [
     addMessage, replaceMessage, updateMessage, deleteMessage, bumpConversationToTop, setOnlineUsers, setUserOnline, 
-    setUserOffline, setTyping, updateConversation, setConnected, markMessagesRead, setConversationUnreadCount, token, currentUserId
+    setUserOffline, setTyping, updateConversation, setConnected, markMessagesRead, setConversationUnreadCount, setMessages, token, currentUserId
   ])
 }
 

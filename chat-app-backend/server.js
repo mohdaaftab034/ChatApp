@@ -12,7 +12,7 @@ async function bootstrap() {
 
   const server = http.createServer(app)
   initSocket(server)
-
+ 
   server.listen(env.PORT, () => {
     logger.info(`Server listening on port ${env.PORT}`)
   })

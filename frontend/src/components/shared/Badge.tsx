@@ -10,7 +10,7 @@ export function Badge({ count, maxDefault = 99, className, ...props }: BadgeProp
   if (count <= 0) return null
 
   const displayCount = count > maxDefault ? `${maxDefault}+` : count
-
+ 
   return (
     <div 
       className={cn(

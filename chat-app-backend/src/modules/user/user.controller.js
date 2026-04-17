@@ -12,7 +12,7 @@ async function me(req, res, next) {
 
 async function getById(req, res, next) {
   try {
-    const data = await userService.getProfileById(req.params.userId)
+    const data = await userService.getProfileById(req.user.sub, req.params.userId)
     return res.status(200).json(formatResponse({ data }))
   } catch (error) {
     return next(error)
@@ -58,4 +58,22 @@ async function updatePublicKey(req, res, next) {
   }
 }
 
-module.exports = { me, directory, getById, updateMe, getPublicKey, updatePublicKey }
+async function blockUser(req, res, next) {
+  try {
+    const data = await userService.blockUser(req.user.sub, req.params.userId)
+    return res.status(200).json(formatResponse({ message: 'Contact blocked', data }))
+  } catch (error) {
+    return next(error)
+  }
+}
+
+async function unblockUser(req, res, next) {
+  try {
+    const data = await userService.unblockUser(req.user.sub, req.params.userId)
+    return res.status(200).json(formatResponse({ message: 'Contact unblocked', data }))
+  } catch (error) {
+    return next(error)
+  }
+}
+
+module.exports = { me, directory, getById, updateMe, getPublicKey, updatePublicKey, blockUser, unblockUser }

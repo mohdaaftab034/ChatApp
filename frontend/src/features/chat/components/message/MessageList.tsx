@@ -128,13 +128,30 @@ export function MessageList() {
                       {senderName}
                     </p>
                   )}
-                  <div className={`relative text-sm ${
-                    isAudioMessage
-                      ? ''
-                      : isSent
-                        ? 'px-3 py-2 rounded-[18px] bg-foreground text-surface rounded-br-sm'
-                        : 'px-3 py-2 rounded-[18px] bg-surface border border-border text-foreground rounded-bl-sm'
-                  }`}>
+                  <div
+                    className={`relative text-sm ${
+                      isAudioMessage
+                        ? ''
+                        : isSent
+                          ? 'px-3 py-2 rounded-[18px] rounded-br-sm border'
+                          : 'px-3 py-2 rounded-[18px] rounded-bl-sm border'
+                    }`}
+                    style={
+                      isAudioMessage
+                        ? undefined
+                        : isSent
+                          ? {
+                              backgroundColor: 'var(--message-out-bg)',
+                              color: 'var(--message-out-text)',
+                              borderColor: 'var(--message-out-border)',
+                            }
+                          : {
+                              backgroundColor: 'var(--message-in-bg)',
+                              color: 'var(--message-in-text)',
+                              borderColor: 'var(--message-in-border)',
+                            }
+                    }
+                  >
                     {msg.isDeleted ? (
                       <span className="italic text-text-secondary">Message deleted</span>
                     ) : msg.type === 'image' && (msg.mediaUrl || msg.localPreviewUrl) ? (

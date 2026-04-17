@@ -9,6 +9,8 @@ router.get('/me', verifyJwt, userController.me)
 router.get('/directory', verifyJwt, userController.directory)
 router.get('/:userId/public-key', verifyJwt, userController.getPublicKey)
 router.get('/:userId', verifyJwt, userController.getById)
+router.post('/:userId/block', verifyJwt, userController.blockUser)
+router.delete('/:userId/block', verifyJwt, userController.unblockUser)
 router.patch('/me', verifyJwt, upload.single('avatar'), userController.updateMe)
 router.patch('/me/public-key', verifyJwt, userController.updatePublicKey)
 

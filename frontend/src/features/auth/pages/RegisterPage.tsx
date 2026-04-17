@@ -10,7 +10,7 @@ import { toast } from 'sonner'
 import { Camera } from 'lucide-react'
 import { signupApi } from '../api/auth.api'
 import { useAuthStore } from '../../../store/authStore'
-import { unlockOrCreateKeyring } from '../../../lib/e2ee'
+import { buildAutoUnlockSecret, cacheAutoUnlockSnapshot, unlockOrCreateKeyring } from '../../../lib/e2ee'
 import { updateMyPublicKeyApi } from '../../chat/api/chat.api'
 
 export default function RegisterPage() {
@@ -70,6 +70,16 @@ export default function RegisterPage() {
         keyId: keyInfo.keyId,
         publicKey: keyInfo.publicKey,
       })
+
+      const autoUnlockSecret = buildAutoUnlockSecret({
+        userId: auth.user.id,
+        token: auth.token,
+        refreshToken: auth.refreshToken,
+      })
+
+      if (autoUnlockSecret) {
+        await cacheAutoUnlockSnapshot(autoUnlockSecret)
+      }
 
       toast.success('Account created successfully')
       navigate(auth.user.username ? '/' : '/profile/setup')

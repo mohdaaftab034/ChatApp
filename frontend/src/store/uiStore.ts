@@ -26,7 +26,7 @@ interface UIState {
   isMobileSidebarOpen: boolean
   isRightPanelOpen: boolean
   profilePanelConversationId: string | null
-  activeModal: 'newChat' | 'createGroup' | 'groupSettings' | 'search' | 'imageViewer' | null
+  activeModal: 'newChat' | 'createGroup' | 'groupSettings' | 'search' | 'imageViewer' | 'blockContactConfirm' | null
   imageViewerSrc: string | null
   replyingTo: Message | null
   editingMessage: Message | null

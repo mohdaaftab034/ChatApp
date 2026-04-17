@@ -87,6 +87,7 @@ export function InputBar() {
 
   const canSendMessages = useMemo(() => {
     if (!activeConversation) return false
+    if (activeConversation.type === 'direct' && activeConversation.isBlocked) return false
     if (activeConversation.type !== 'group') return true
 
     if (activeConversation.group?.settings?.whoCanSend !== 'admins') return true
@@ -95,6 +96,10 @@ export function InputBar() {
   }, [activeConversation, currentUserId])
 
   const sendDisabledReason = useMemo(() => {
+    if (activeConversation?.type === 'direct' && activeConversation.isBlocked) {
+      return 'Messaging is disabled because this contact is blocked'
+    }
+
     if (!activeConversation?.group) return ''
     if (activeConversation.group.settings?.whoCanSend !== 'admins') return ''
     if (currentUserId && activeConversation.group.adminIds.includes(currentUserId)) return ''

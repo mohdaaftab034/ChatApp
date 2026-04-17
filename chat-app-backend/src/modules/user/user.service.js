@@ -1,5 +1,27 @@
 const User = require('../../models/User.model')
 const cloudinary = require('../../config/cloudinary')
+const { getBlockState } = require('../../utils/blocking')
+const privacyService = require('../privacy/privacy.service')
+const Contact = require('../../models/Contact.model')
+
+function normalizeExternalUrl(value) {
+  const raw = String(value || '').trim()
+  if (!raw) return ''
+
+  const withProtocol = /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(raw)
+    ? raw
+    : `https://${raw.replace(/^\/+/, '')}`
+
+  try {
+    const parsed = new URL(withProtocol)
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return ''
+    }
+    return parsed.toString()
+  } catch {
+    return ''
+  }
+}
 
 function toProfile(userDoc) {
   return {
@@ -47,7 +69,7 @@ async function getMyProfile(userId) {
   return toProfile(user)
 }
 
-async function getProfileById(userId) {
+async function getProfileById(viewerId, userId) {
   const user = await User.findById(userId).select('-password')
   if (!user) {
     const error = new Error('User not found')
@@ -55,7 +77,75 @@ async function getProfileById(userId) {
     throw error
   }
 
-  return toProfile(user)
+  const blockState = await getBlockState(viewerId, userId)
+  if (blockState.isBlocked) {
+    return {
+      id: user._id.toString(),
+      name: user.name,
+      username: user.username || '',
+      avatar: user.avatar,
+      status: 'offline',
+      headline: '',
+      bio: 'Profile is unavailable',
+      email: '',
+      phone: '',
+      location: '',
+      department: '',
+      role: '',
+      joinedAt: user.createdAt,
+      social: {
+        website: '',
+        linkedin: '',
+        x: '',
+      },
+      isBlocked: true,
+    }
+  }
+
+  // If viewing own profile, show all info
+  if (viewerId === userId) {
+    return { ...toProfile(user), isBlocked: false }
+  }
+
+  // Apply privacy settings for viewing other user's profile
+  const profile = { ...toProfile(user), isBlocked: false }
+
+  // Check if viewer is a contact (for privacy decisions)
+  const isContact = await Contact.findOne({
+    userId: user._id,
+    contactId: viewerId,
+  })
+
+  // Helper function to check if info should be visible
+  const canViewInfo = (privacySettingValue) => {
+    if (privacySettingValue === 'everyone') return true
+    if (privacySettingValue === 'nobody') return false
+    if (privacySettingValue === 'contacts') return !!isContact
+    return true
+  }
+
+  // Apply privacy settings
+  const privacy = user.privacy || privacyService.DEFAULT_PRIVACY_SETTINGS
+
+  // Hide profile photo if privacy setting is restrictive
+  if (!canViewInfo(privacy.profilePhoto)) {
+    profile.avatar = null
+  }
+
+  // Hide about info (bio, headline, location, dept, social) if privacy setting is restrictive
+  if (!canViewInfo(privacy.aboutInfo)) {
+    profile.bio = ''
+    profile.headline = ''
+    profile.location = ''
+    profile.department = ''
+    profile.social = {
+      website: '',
+      linkedin: '',
+      x: '',
+    }
+  }
+
+  return profile
 }
 
 async function listDirectoryUsers(requesterId, { q = '', limit = 30 } = {}) {
@@ -76,23 +166,46 @@ async function listDirectoryUsers(requesterId, { q = '', limit = 30 } = {}) {
   }
 
   const users = await User.find(criteria)
-    .select('_id name username email avatar status lastSeen bio isVerified phone')
+    .select('_id name username email avatar status lastSeen bio isVerified phone privacy')
     .sort({ name: 1 })
     .limit(safeLimit)
     .lean()
 
-  return users.map((user) => ({
-    id: user._id.toString(),
-    name: user.name,
-    username: user.username || '',
-    email: user.email,
-    avatar: user.avatar,
-    status: user.status,
-    lastSeen: user.lastSeen,
-    bio: user.bio || '',
-    isVerified: Boolean(user.isVerified),
-    phone: user.phone || '',
-  }))
+  const visibilityRows = await Contact.find({
+    userId: { $in: users.map((user) => user._id) },
+    contactId: requesterId,
+  }).select('userId').lean()
+  const targetHasViewerAsContact = new Set(visibilityRows.map((row) => row.userId.toString()))
+
+  return users.map((user) => {
+    const privacy = user.privacy || privacyService.DEFAULT_PRIVACY_SETTINGS
+    const isContact = targetHasViewerAsContact.has(user._id.toString())
+
+    const canViewBySetting = (privacySettingValue) => {
+      if (privacySettingValue === 'nobody') return false
+      if (privacySettingValue === 'contacts') return isContact
+      return true
+    }
+
+    const result = {
+      id: user._id.toString(),
+      name: user.name,
+      username: user.username || '',
+      email: user.email,
+      avatar: canViewBySetting(privacy.profilePhoto) ? user.avatar : null,
+      status: user.status,
+      bio: user.bio || '',
+      isVerified: Boolean(user.isVerified),
+      phone: user.phone || '',
+    }
+
+    // Apply privacy settings for lastSeen
+    const canViewLastSeen = canViewBySetting(privacy.lastSeen)
+
+    result.lastSeen = canViewLastSeen ? user.lastSeen : null
+
+    return result
+  })
 }
 
 async function updateMyProfile(userId, payload, file) {
@@ -132,9 +245,9 @@ async function updateMyProfile(userId, payload, file) {
   }
 
   user.social = {
-    website: typeof payload.website === 'string' ? payload.website.trim() : (user.social?.website || ''),
-    linkedin: typeof payload.linkedin === 'string' ? payload.linkedin.trim() : (user.social?.linkedin || ''),
-    x: typeof payload.x === 'string' ? payload.x.trim() : (user.social?.x || ''),
+    website: typeof payload.website === 'string' ? normalizeExternalUrl(payload.website) : (user.social?.website || ''),
+    linkedin: typeof payload.linkedin === 'string' ? normalizeExternalUrl(payload.linkedin) : (user.social?.linkedin || ''),
+    x: typeof payload.x === 'string' ? normalizeExternalUrl(payload.x) : (user.social?.x || ''),
   }
 
   if (file) {
@@ -188,6 +301,43 @@ async function updateMyPublicKey(userId, payload) {
   }
 }
 
+async function blockUser(userId, targetUserId) {
+  if (!targetUserId || targetUserId === userId) {
+    const error = new Error('Invalid user to block')
+    error.statusCode = 400
+    throw error
+  }
+
+  const target = await User.findById(targetUserId).select('_id').lean()
+  if (!target) {
+    const error = new Error('User not found')
+    error.statusCode = 404
+    throw error
+  }
+
+  await User.updateOne(
+    { _id: userId },
+    { $addToSet: { blockedUserIds: targetUserId } }
+  )
+
+  return { blockedUserId: targetUserId }
+}
+
+async function unblockUser(userId, targetUserId) {
+  if (!targetUserId || targetUserId === userId) {
+    const error = new Error('Invalid user to unblock')
+    error.statusCode = 400
+    throw error
+  }
+
+  await User.updateOne(
+    { _id: userId },
+    { $pull: { blockedUserIds: targetUserId } }
+  )
+
+  return { unblockedUserId: targetUserId }
+}
+
 async function getUserPublicKey(userId) {
   const user = await User.findById(userId).select('_id e2ee')
   if (!user || !user.e2ee?.publicKey || !user.e2ee?.activeKeyId) {
@@ -208,6 +358,8 @@ module.exports = {
   getProfileById,
   listDirectoryUsers,
   updateMyProfile,
+  blockUser,
+  unblockUser,
   updateMyPublicKey,
   getUserPublicKey,
 }

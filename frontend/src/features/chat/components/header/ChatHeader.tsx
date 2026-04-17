@@ -5,6 +5,39 @@ import { useChatStore } from '../../../../store/chatStore'
 import { useAuthStore } from '../../../../store/authStore'
 import { useUIStore } from '../../../../store/uiStore'
 
+function formatLastSeen(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return null
+  }
+
+  const now = new Date()
+  const sameDay =
+    date.getFullYear() === now.getFullYear()
+    && date.getMonth() === now.getMonth()
+    && date.getDate() === now.getDate()
+
+  const yesterday = new Date(now)
+  yesterday.setDate(now.getDate() - 1)
+  const isYesterday =
+    date.getFullYear() === yesterday.getFullYear()
+    && date.getMonth() === yesterday.getMonth()
+    && date.getDate() === yesterday.getDate()
+
+  const time = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+
+  if (sameDay) return `today at ${time}`
+  if (isYesterday) return `yesterday at ${time}`
+
+  const shortDate = date.toLocaleDateString([], {
+    day: '2-digit',
+    month: 'short',
+    year: now.getFullYear() === date.getFullYear() ? undefined : 'numeric',
+  })
+
+  return `${shortDate} at ${time}`
+}
+
 export function ChatHeader() {
   const { activeConversationId, conversations, typingUsers, onlineUsers } = useChatStore()
   const currentUserId = useAuthStore(s => s.user?.id)
@@ -27,6 +60,7 @@ export function ChatHeader() {
   const otherTypingUsers = typingInThis.filter(id => id !== currentUserId)
   
   let subText: React.ReactNode = ''
+  const formattedLastSeen = otherUser?.lastSeen ? formatLastSeen(otherUser.lastSeen) : null
   
   if (otherTypingUsers.length > 0) {
     const typingNames = otherTypingUsers.map(id => conversation.participants.find(p => p.id === id)?.name).filter(Boolean)
@@ -36,8 +70,8 @@ export function ChatHeader() {
     subText = `${conversation.participants.length} members`
   } else if (isOnline) {
     subText = <span className="text-online">Online</span>
-  } else if (otherUser?.lastSeen) {
-    subText = `Last seen ${new Date(otherUser.lastSeen).toLocaleDateString()}`
+  } else if (formattedLastSeen) {
+    subText = `Offline • Last seen ${formattedLastSeen}`
   } else {
     subText = 'Offline'
   }

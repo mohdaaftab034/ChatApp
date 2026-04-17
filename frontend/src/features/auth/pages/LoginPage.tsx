@@ -9,7 +9,7 @@ import { cn } from "../../../lib/utils";
 import { useState } from "react";
 import { toast } from "sonner";
 import { loginApi } from "../api/auth.api";
-import { maybeRotateKeyPair, unlockOrCreateKeyring } from "../../../lib/e2ee";
+import { buildAutoUnlockSecret, cacheAutoUnlockSnapshot, maybeRotateKeyPair, unlockOrCreateKeyring } from "../../../lib/e2ee";
 import { updateMyPublicKeyApi } from "../../chat/api/chat.api";
 
 export default function LoginPage() {
@@ -38,6 +38,16 @@ export default function LoginPage() {
         keyId: activeKey.keyId,
         publicKey: activeKey.publicKey,
       })
+
+      const autoUnlockSecret = buildAutoUnlockSecret({
+        userId: auth.user.id,
+        token: auth.token,
+        refreshToken: auth.refreshToken,
+      })
+
+      if (autoUnlockSecret) {
+        await cacheAutoUnlockSnapshot(autoUnlockSecret)
+      }
 
       toast.success("Logged in successfully");
       navigate("/");

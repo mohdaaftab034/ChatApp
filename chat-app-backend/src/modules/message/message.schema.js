@@ -65,6 +65,14 @@ const markReadSchema = z.object({
   query: z.object({}).optional(),
 })
 
+const clearMessagesSchema = z.object({
+  body: z.object({
+    conversationId: z.string().min(1),
+  }),
+  params: z.object({}).optional(),
+  query: z.object({}).optional(),
+})
+
 const deleteMessageSchema = z.object({
   body: z.object({}).optional(),
   params: z.object({
@@ -78,5 +86,6 @@ module.exports = {
   searchMessagesSchema,
   createMessageSchema,
   markReadSchema,
+  clearMessagesSchema,
   deleteMessageSchema,
 }

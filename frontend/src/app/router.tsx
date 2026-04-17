@@ -37,6 +37,9 @@ const SearchPage = React.lazy(
 const SettingsPage = React.lazy(
   () => import("../features/settings/pages/SettingsPage"),
 );
+const ThemeSettingsPage = React.lazy(
+  () => import("../features/settings/pages/ThemeSettingsPage"),
+);
 const ProfilePage = React.lazy(
   () => import("../features/profile/pages/ProfilePage"),
 );
@@ -50,28 +53,36 @@ const Fallback = () => (
 
 // Route Guards
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
+  const hasHydrated = useAuthStore((state) => state.hasHydrated);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  if (!hasHydrated) return <Fallback />;
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
 };
 
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
+  const hasHydrated = useAuthStore((state) => state.hasHydrated);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  if (!hasHydrated) return <Fallback />;
   return !isAuthenticated ? <>{children}</> : <Navigate to="/" replace />;
 };
 
 const FirstTimeRoute = ({ children }: { children: React.ReactNode }) => {
+  const hasHydrated = useAuthStore((state) => state.hasHydrated);
   const user = useAuthStore((state) => state.user);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
+  if (!hasHydrated) return <Fallback />;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (user && !user.username) return <>{children}</>;
   return <Navigate to="/" replace />;
 };
 
 const RequireProfileRoute = ({ children }: { children: React.ReactNode }) => {
+  const hasHydrated = useAuthStore((state) => state.hasHydrated);
   const user = useAuthStore((state) => state.user);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
+  if (!hasHydrated) return <Fallback />;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (user && !user.username) return <Navigate to="/profile/setup" replace />;
   return <>{children}</>;
@@ -179,6 +190,16 @@ const router = createBrowserRouter([
       <RequireProfileRoute>
         <Suspense fallback={<Fallback />}>
           <SettingsPage />
+        </Suspense>
+      </RequireProfileRoute>
+    ),
+  },
+  {
+    path: "/settings/theme",
+    element: (
+      <RequireProfileRoute>
+        <Suspense fallback={<Fallback />}>
+          <ThemeSettingsPage />
         </Suspense>
       </RequireProfileRoute>
     ),
