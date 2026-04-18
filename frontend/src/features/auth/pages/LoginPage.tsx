@@ -4,17 +4,23 @@ import { Link, useNavigate } from "react-router-dom";
 import { loginSchema, LoginFormValues } from "../schemas/auth.schemas";
 import { AuthLayout } from "../components/AuthLayout";
 import { PasswordInput } from "../components/PasswordInput";
-import { useAuthStore } from "../../../store/authStore";
 import { cn } from "../../../lib/utils";
 import { useState } from "react";
 import { toast } from "sonner";
 import { loginApi } from "../api/auth.api";
-import { buildAutoUnlockSecret, cacheAutoUnlockSnapshot, maybeRotateKeyPair, unlockOrCreateKeyring } from "../../../lib/e2ee";
-import { updateMyPublicKeyApi } from "../../chat/api/chat.api";
+
+// Helper for error handling
+function getErrorMessage(error: unknown, fallback: string) {
+  if (typeof error === 'object' && error && 'response' in error) {
+    const response = (error as { response?: { data?: { message?: string } } }).response;
+    const message = response?.data?.message;
+    if (message) return message;
+  }
+  return error instanceof Error ? error.message : fallback;
+}
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { login } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
 
   const {
@@ -23,36 +29,23 @@ export default function LoginPage() {
     formState: { errors },
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
-  }); 
+  });
 
   const onSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
     try {
-      const auth = await loginApi(data);
-      login(auth.user, auth.token, auth.refreshToken);
-
-      const unlocked = await unlockOrCreateKeyring(data.password)
-      const rotated = await maybeRotateKeyPair(data.password, 30)
-      const activeKey = rotated?.keyId ? rotated : unlocked
-      await updateMyPublicKeyApi({
-        keyId: activeKey.keyId,
-        publicKey: activeKey.publicKey,
-      })
-
-      const autoUnlockSecret = buildAutoUnlockSecret({
-        userId: auth.user.id,
-        token: auth.token,
-        refreshToken: auth.refreshToken,
-      })
-
-      if (autoUnlockSecret) {
-        await cacheAutoUnlockSnapshot(autoUnlockSecret)
-      }
-
-      toast.success("Logged in successfully");
-      navigate("/");
+      const challenge = await loginApi(data);
+      toast.success("OTP sent to your email");
+      navigate('/verify-otp', {
+        state: {
+          email: data.email,
+          challengeId: challenge.challengeId,
+          mode: 'login',
+          password: data.password,
+        },
+      });
     } catch (error) {
-      toast.error("Invalid credentials");
+      toast.error(getErrorMessage(error, 'Unable to sign in'));
     } finally {
       setIsLoading(false);
     }
@@ -60,28 +53,27 @@ export default function LoginPage() {
 
   return (
     <AuthLayout>
-      <div className="flex flex-col space-y-6">
-        <div className="flex flex-col space-y-2 text-center">
+      <div className="mx-auto w-full max-w-sm space-y-6">
+        {/* Header */}
+        <div className="text-center space-y-2">
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            Sign in to your account
+            Welcome back
           </h1>
-          <p className="text-sm text-text-secondary">
-            Enter your email and password to continue
+          <p className="text-sm text-muted-foreground">
+            Enter your email to sign in to your account
           </p>
         </div>
 
+        {/* Form */}
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium leading-none text-foreground">
-              Email
-            </label>
+            <label className="text-sm font-medium text-foreground">Email</label>
             <input
               type="email"
               autoComplete="email"
               className={cn(
-                "flex h-10 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50",
-                errors.email &&
-                  "border-destructive focus-visible:ring-destructive",
+                "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+                errors.email && "border-destructive focus-visible:ring-destructive"
               )}
               {...register("email")}
             />
@@ -92,46 +84,31 @@ export default function LoginPage() {
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-sm font-medium leading-none text-foreground">
-                Password
-              </label>
-              <Link
-                to="/forgot-password"
-                className="text-sm font-medium text-text-secondary hover:text-foreground"
-              >
+              <label className="text-sm font-medium text-foreground">Password</label>
+              <Link to="/forgot-password" className="text-sm text-primary hover:underline underline-offset-4">
                 Forgot password?
               </Link>
             </div>
+            {/* Make sure PasswordInput is imported and accepts standard props */}
             <PasswordInput
-              error={errors.password?.message}
               {...register("password")}
+              error={errors.password?.message}
             />
-            {errors.password && (
-              <p className="text-xs text-destructive">
-                {errors.password.message}
-              </p>
-            )}
           </div>
 
           <button
             type="submit"
             disabled={isLoading}
-            className="inline-flex h-10 w-full items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-colors hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-50"
+            className="inline-flex h-10 w-full items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground ring-offset-background transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
           >
-            {isLoading ? (
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-accent-foreground border-t-transparent" />
-            ) : (
-              "Sign in"
-            )}
+            {isLoading ? "Signing in..." : "Sign in"}
           </button>
         </form>
 
-        <p className="text-center text-sm text-text-secondary">
-          Don't have an account?{" "}
-          <Link
-            to="/register"
-            className="font-medium text-foreground hover:underline focus-visible:outline-none"
-          >
+        {/* Footer */}
+        <p className="text-center text-sm text-muted-foreground">
+          Don&apos;t have an account?{" "}
+          <Link to="/register" className="font-medium text-primary hover:underline underline-offset-4">
             Sign up
           </Link>
         </p>

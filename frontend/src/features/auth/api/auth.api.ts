@@ -13,13 +13,31 @@ type AuthPayload = {
   refreshToken: string
 }
 
+type OtpChallengePayload = {
+  requiresOtp: boolean
+  mode: 'signup' | 'login'
+  challengeId: string
+  email: string
+  expiresInSeconds: number
+}
+
 export async function loginApi(payload: { email: string; password: string }) {
-  const response = await api.post<ApiEnvelope<AuthPayload>>('/auth/login', payload)
+  const response = await api.post<ApiEnvelope<OtpChallengePayload>>('/auth/login', payload)
   return response.data.data
 }
 
 export async function signupApi(payload: { name: string; email: string; password: string }) {
-  const response = await api.post<ApiEnvelope<AuthPayload>>('/auth/signup', payload)
+  const response = await api.post<ApiEnvelope<OtpChallengePayload>>('/auth/signup', payload)
+  return response.data.data
+}
+
+export async function verifyOtpApi(payload: { challengeId: string; otp: string }) {
+  const response = await api.post<ApiEnvelope<AuthPayload>>('/auth/verify-otp', payload)
+  return response.data.data
+}
+
+export async function resendOtpApi(payload: { challengeId: string }) {
+  const response = await api.post<ApiEnvelope<{ challengeId: string; email: string; expiresInSeconds: number }>>('/auth/resend-otp', payload)
   return response.data.data
 }
 

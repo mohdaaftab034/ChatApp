@@ -3,16 +3,30 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { AuthLayout } from '../components/AuthLayout'
 import { OtpInput } from '../components/OtpInput'
 import { toast } from 'sonner'
+import { resendOtpApi, verifyOtpApi } from '../api/auth.api'
+import { useAuthStore } from '../../../store/authStore'
+import { buildAutoUnlockSecret, cacheAutoUnlockSnapshot, maybeRotateKeyPair, unlockOrCreateKeyring } from '../../../lib/e2ee'
+import { updateMyPublicKeyApi } from '../../chat/api/chat.api'
 
 export default function OtpVerifyPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const login = useAuthStore((state) => state.login)
   const [otp, setOtp] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [countdown, setCountdown] = useState(60)
 
   const email = location.state?.email || ''
-  const mode = location.state?.mode || 'reset'
+  const mode = location.state?.mode || 'login'
+  const challengeId = location.state?.challengeId || ''
+  const password = location.state?.password || ''
+
+  useEffect(() => {
+    if (!email || !challengeId || !password) {
+      toast.error('Verification session expired. Please try again.')
+      navigate(mode === 'signup' ? '/register' : '/login', { replace: true })
+    }
+  }, [challengeId, email, mode, navigate, password])
 
   useEffect(() => {
     if (countdown > 0) {
@@ -26,8 +40,30 @@ export default function OtpVerifyPage() {
     
     setIsLoading(true)
     try {
-      await new Promise(resolve => setTimeout(resolve, 400))
-      navigate('/reset-password', { state: { email, otp: code, mode } })
+      const auth = await verifyOtpApi({ challengeId, otp: code })
+      login(auth.user, auth.token, auth.refreshToken)
+
+      const unlocked = await unlockOrCreateKeyring(password)
+      const rotated = await maybeRotateKeyPair(password, 30)
+      const activeKey = rotated?.keyId ? rotated : unlocked
+
+      await updateMyPublicKeyApi({
+        keyId: activeKey.keyId,
+        publicKey: activeKey.publicKey,
+      })
+
+      const autoUnlockSecret = buildAutoUnlockSecret({
+        userId: auth.user.id,
+        token: auth.token,
+        refreshToken: auth.refreshToken,
+      })
+
+      if (autoUnlockSecret) {
+        await cacheAutoUnlockSnapshot(autoUnlockSecret)
+      }
+
+      toast.success('Verification successful')
+      navigate(auth.user.username ? '/' : '/profile/setup')
     } catch (error) {
       toast.error('Invalid verification code')
     } finally {
@@ -37,8 +73,14 @@ export default function OtpVerifyPage() {
 
   const handleResend = async () => {
     if (countdown > 0) return
-    setCountdown(60)
-    toast.success(`Code resent to ${email}`)
+    try {
+      await resendOtpApi({ challengeId })
+      setCountdown(60)
+      setOtp('')
+      toast.success(`Code resent to ${email}`)
+    } catch {
+      toast.error('Failed to resend code')
+    }
   }
 
   return (
@@ -47,7 +89,7 @@ export default function OtpVerifyPage() {
         <div className="flex flex-col space-y-2 text-center">
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Check your email</h1>
           <p className="text-sm text-text-secondary">
-            Enter the 6-digit reset code sent to <span className="font-medium text-foreground">{email || 'your email'}</span>
+            Enter the 6-digit verification code sent to <span className="font-medium text-foreground">{email || 'your email'}</span>
           </p>
         </div>
 

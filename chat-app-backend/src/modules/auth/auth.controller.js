@@ -4,7 +4,7 @@ const { formatResponse } = require('../../utils/formatResponse')
 async function signup(req, res, next) {
   try {
     const data = await authService.signup(req.validated.body)
-    return res.status(201).json(formatResponse({ message: 'Signup successful', data }))
+    return res.status(200).json(formatResponse({ message: 'OTP sent to your email', data }))
   } catch (error) {
     return next(error)
   }
@@ -13,7 +13,25 @@ async function signup(req, res, next) {
 async function login(req, res, next) {
   try {
     const data = await authService.login(req.validated.body)
-    return res.status(200).json(formatResponse({ message: 'Login successful', data }))
+    return res.status(200).json(formatResponse({ message: 'OTP sent to your email', data }))
+  } catch (error) {
+    return next(error)
+  }
+}
+
+async function verifyOtp(req, res, next) {
+  try {
+    const data = await authService.verifyOtp(req.validated.body)
+    return res.status(200).json(formatResponse({ message: 'OTP verified', data }))
+  } catch (error) {
+    return next(error)
+  }
+}
+
+async function resendOtp(req, res, next) {
+  try {
+    const data = await authService.resendOtp(req.validated.body)
+    return res.status(200).json(formatResponse({ message: 'OTP resent', data }))
   } catch (error) {
     return next(error)
   }
@@ -58,6 +76,8 @@ async function me(req, res, next) {
 module.exports = {
   signup,
   login,
+  verifyOtp,
+  resendOtp,
   forgotPassword,
   resetPassword,
   refresh,

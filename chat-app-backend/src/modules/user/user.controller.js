@@ -1,5 +1,38 @@
 const userService = require('./user.service')
 const { formatResponse } = require('../../utils/formatResponse')
+const { getIO } = require('../../config/socket')
+const roomNames = require('../../sockets/rooms')
+const Conversation = require('../../models/Conversation.model')
+const conversationService = require('../conversation/conversation.service')
+
+async function emitDirectConversationUpdate(userId, targetUserId) {
+  const io = getIO()
+  if (!io) return
+
+  const directConversation = await Conversation.findOne({
+    type: 'direct',
+    participantIds: { $all: [userId, targetUserId], $size: 2 },
+  })
+    .select('_id participantIds')
+    .lean()
+
+  if (!directConversation?._id) return
+
+  const participantIds = Array.isArray(directConversation.participantIds)
+    ? directConversation.participantIds
+    : [userId, targetUserId]
+
+  for (const participantId of participantIds) {
+    const conversationForUser = await conversationService.getConversationByIdForUser({
+      conversationId: directConversation._id,
+      userId: participantId,
+    })
+
+    if (conversationForUser) {
+      io.to(roomNames.user(participantId)).emit('conversation_updated', conversationForUser)
+    }
+  }
+}
 
 async function me(req, res, next) {
   try {
@@ -61,6 +94,7 @@ async function updatePublicKey(req, res, next) {
 async function blockUser(req, res, next) {
   try {
     const data = await userService.blockUser(req.user.sub, req.params.userId)
+    await emitDirectConversationUpdate(req.user.sub, req.params.userId)
     return res.status(200).json(formatResponse({ message: 'Contact blocked', data }))
   } catch (error) {
     return next(error)
@@ -70,6 +104,7 @@ async function blockUser(req, res, next) {
 async function unblockUser(req, res, next) {
   try {
     const data = await userService.unblockUser(req.user.sub, req.params.userId)
+    await emitDirectConversationUpdate(req.user.sub, req.params.userId)
     return res.status(200).json(formatResponse({ message: 'Contact unblocked', data }))
   } catch (error) {
     return next(error)

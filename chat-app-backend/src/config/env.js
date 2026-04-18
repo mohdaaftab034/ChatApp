@@ -3,6 +3,42 @@ const dotenv = require('dotenv')
 
 dotenv.config()
 
+function normalizeCredential(value) {
+  return String(value || '').replace(/\s+/g, '').trim()
+}
+
+const hasNodemailerCredentials = Boolean(
+  process.env.NODEMAILER_EMAIL ||
+  process.env.nodemailer_email ||
+  process.env.NODEMAILER_PASS ||
+  process.env.nodemailer_pass
+)
+
+const mergedEnv = {
+  ...process.env,
+  SMTP_HOST: hasNodemailerCredentials
+    ? (process.env.NODEMAILER_HOST || process.env.nodemailer_host || 'smtp.gmail.com')
+    : (process.env.SMTP_HOST || 'smtp.gmail.com'),
+  SMTP_PORT: hasNodemailerCredentials
+    ? (process.env.NODEMAILER_PORT || process.env.nodemailer_port || '465')
+    : (process.env.SMTP_PORT || '587'),
+  SMTP_USER: normalizeCredential(process.env.NODEMAILER_EMAIL || process.env.nodemailer_email || process.env.SMTP_USER),
+  SMTP_PASS: normalizeCredential(process.env.NODEMAILER_PASS || process.env.nodemailer_pass || process.env.SMTP_PASS),
+  SMTP_FROM: hasNodemailerCredentials
+    ? (
+      process.env.NODEMAILER_FROM
+      || process.env.nodemailer_from
+      || process.env.NODEMAILER_EMAIL
+      || process.env.nodemailer_email
+      || process.env.SMTP_FROM
+    )
+    : (
+      process.env.SMTP_FROM
+      || process.env.NODEMAILER_EMAIL
+      || process.env.nodemailer_email
+    ),
+}
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().default(4000),
@@ -25,7 +61,7 @@ const envSchema = z.object({
 }) 
 
 
-const parsed = envSchema.safeParse(process.env)
+const parsed = envSchema.safeParse(mergedEnv)
 
 if (!parsed.success) {
   throw new Error(`Invalid environment variables: ${parsed.error.message}`)

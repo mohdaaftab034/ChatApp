@@ -29,6 +29,7 @@ type ProfileRecord = {
     x: string
   }
   isBlocked: boolean
+  canUnblock: boolean
 }
 
 function toProfileRecord(profile: ProfileData): ProfileRecord {
@@ -52,6 +53,7 @@ function toProfileRecord(profile: ProfileData): ProfileRecord {
       x: profile.social?.x || '',
     },
     isBlocked: Boolean(profile.isBlocked),
+    canUnblock: Boolean(profile.canUnblock),
   }
 }
 
@@ -104,6 +106,7 @@ export function RightPanel() {
           x: '',
         },
         isBlocked: Boolean(conversation?.isBlocked),
+        canUnblock: Boolean(conversation?.canUnblock),
       }
     : null
 
@@ -129,6 +132,7 @@ export function RightPanel() {
           x: '',
         },
         isBlocked: false,
+        canUnblock: false,
       }
     : null
 
@@ -189,7 +193,8 @@ export function RightPanel() {
 
   const profileData = {
     ...(profile as ProfileRecord),
-    isBlocked: Boolean(conversation?.isBlocked || (profile as ProfileRecord | null)?.isBlocked),
+    isBlocked: Boolean(conversation ? conversation.isBlocked : (profile as ProfileRecord | null)?.isBlocked),
+    canUnblock: Boolean(conversation ? conversation.canUnblock : (profile as ProfileRecord | null)?.canUnblock),
   }
   const isProfileOwner = Boolean(currentUserId && profileData.id === currentUserId)
 
@@ -287,7 +292,7 @@ export function RightPanel() {
     : [
         { id: 'star', label: 'Star messages', icon: Star },
         { id: 'archive', label: 'Archive chat', icon: Archive },
-        { id: 'block', label: profileData.isBlocked ? 'Unblock contact' : 'Block contact', icon: Ban, destructive: true },
+        { id: 'block', label: profileData.canUnblock ? 'Unblock contact' : 'Block contact', icon: Ban, destructive: true },
         { id: 'report', label: 'Report contact', icon: Flag, destructive: true },
         { id: 'clear', label: 'Clear messages', icon: Trash2, destructive: true },
       ] as const

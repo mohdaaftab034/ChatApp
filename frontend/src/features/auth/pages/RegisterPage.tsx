@@ -9,13 +9,23 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { Camera } from 'lucide-react'
 import { signupApi } from '../api/auth.api'
-import { useAuthStore } from '../../../store/authStore'
-import { buildAutoUnlockSecret, cacheAutoUnlockSnapshot, unlockOrCreateKeyring } from '../../../lib/e2ee'
-import { updateMyPublicKeyApi } from '../../chat/api/chat.api'
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (typeof error === 'object' && error && 'response' in error) {
+    const response = (error as { response?: { data?: { message?: string } } }).response
+    const message = response?.data?.message
+    if (message) return message
+  }
+
+  if (error instanceof Error && error.message) {
+    return error.message
+  }
+
+  return fallback
+}
 
 export default function RegisterPage() {
   const navigate = useNavigate()
-  const login = useAuthStore((state) => state.login)
   const [isLoading, setIsLoading] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
 
@@ -57,34 +67,23 @@ export default function RegisterPage() {
   const onSubmit = async (data: RegisterFormValues) => {
     setIsLoading(true)
     try {
-      const auth = await signupApi({
+      const challenge = await signupApi({
         name: data.name,
         email: data.email,
         password: data.password,
       })
 
-      login(auth.user, auth.token, auth.refreshToken)
-
-      const keyInfo = await unlockOrCreateKeyring(data.password)
-      await updateMyPublicKeyApi({
-        keyId: keyInfo.keyId,
-        publicKey: keyInfo.publicKey,
+      toast.success('OTP sent to your email')
+      navigate('/verify-otp', {
+        state: {
+          email: data.email,
+          challengeId: challenge.challengeId,
+          mode: 'signup',
+          password: data.password,
+        },
       })
-
-      const autoUnlockSecret = buildAutoUnlockSecret({
-        userId: auth.user.id,
-        token: auth.token,
-        refreshToken: auth.refreshToken,
-      })
-
-      if (autoUnlockSecret) {
-        await cacheAutoUnlockSnapshot(autoUnlockSecret)
-      }
-
-      toast.success('Account created successfully')
-      navigate(auth.user.username ? '/' : '/profile/setup')
     } catch (error) {
-      toast.error('Registration failed')
+      toast.error(getErrorMessage(error, 'Registration failed'))
     } finally {
       setIsLoading(false)
     }

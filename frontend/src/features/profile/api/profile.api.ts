@@ -20,6 +20,7 @@ export type ProfileData = {
     x: string
   }
   isBlocked?: boolean
+  canUnblock?: boolean
 }
 
 type ApiEnvelope<T> = {

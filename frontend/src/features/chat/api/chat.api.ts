@@ -9,6 +9,15 @@ type ApiEnvelope<T> = {
   message: string
 }
 
+export type MessageSearchResult = {
+  messageId: string
+  conversationId: string
+  senderId: string
+  type: Message['type']
+  text: string
+  createdAt: string
+}
+
 export async function listConversationsApi() {
   const response = await api.get<ApiEnvelope<Conversation[]>>('/conversations')
   return response.data.data
@@ -24,6 +33,25 @@ export async function listMessagesApi(conversationId: string, limit = 50) {
 export async function searchMessagesApi(conversationId: string, q: string, limit = 50) {
   const response = await api.get<ApiEnvelope<Message[]>>('/messages/search', {
     params: { conversationId, q, limit },
+  })
+  return response.data.data
+}
+
+export async function searchGlobalMessagesApi(
+  q: string,
+  options: {
+    conversationId?: string
+    limit?: number
+    signal?: AbortSignal
+  } = {}
+) {
+  const response = await api.get<ApiEnvelope<MessageSearchResult[]>>('/search', {
+    params: {
+      q,
+      conversationId: options.conversationId,
+      limit: options.limit ?? 30,
+    },
+    signal: options.signal,
   })
   return response.data.data
 }

@@ -78,12 +78,12 @@ async function getProfileById(viewerId, userId) {
   }
 
   const blockState = await getBlockState(viewerId, userId)
-  if (blockState.isBlocked) {
+  if (blockState.targetBlockedViewer) {
     return {
       id: user._id.toString(),
       name: user.name,
       username: user.username || '',
-      avatar: user.avatar,
+      avatar: null,
       status: 'offline',
       headline: '',
       bio: 'Profile is unavailable',
@@ -99,16 +99,21 @@ async function getProfileById(viewerId, userId) {
         x: '',
       },
       isBlocked: true,
+      canUnblock: false,
     }
   }
 
   // If viewing own profile, show all info
   if (viewerId === userId) {
-    return { ...toProfile(user), isBlocked: false }
+    return { ...toProfile(user), isBlocked: false, canUnblock: false }
   }
 
   // Apply privacy settings for viewing other user's profile
-  const profile = { ...toProfile(user), isBlocked: false }
+  const profile = {
+    ...toProfile(user),
+    isBlocked: Boolean(blockState.isBlocked),
+    canUnblock: Boolean(blockState.viewerBlockedTarget),
+  }
 
   // Check if viewer is a contact (for privacy decisions)
   const isContact = await Contact.findOne({
@@ -165,8 +170,11 @@ async function listDirectoryUsers(requesterId, { q = '', limit = 30 } = {}) {
     ]
   }
 
+  const requester = await User.findById(requesterId).select('_id blockedUserIds').lean()
+  const requesterBlockedUserIds = new Set((requester?.blockedUserIds || []).map((id) => String(id)))
+
   const users = await User.find(criteria)
-    .select('_id name username email avatar status lastSeen bio isVerified phone privacy')
+    .select('_id name username email avatar status lastSeen bio isVerified phone privacy blockedUserIds')
     .sort({ name: 1 })
     .limit(safeLimit)
     .lean()
@@ -178,8 +186,12 @@ async function listDirectoryUsers(requesterId, { q = '', limit = 30 } = {}) {
   const targetHasViewerAsContact = new Set(visibilityRows.map((row) => row.userId.toString()))
 
   return users.map((user) => {
+    const userId = user._id.toString()
     const privacy = user.privacy || privacyService.DEFAULT_PRIVACY_SETTINGS
-    const isContact = targetHasViewerAsContact.has(user._id.toString())
+    const isContact = targetHasViewerAsContact.has(userId)
+    const userBlockedRequester = Boolean((user.blockedUserIds || []).includes(requesterId))
+    const requesterBlockedUser = requesterBlockedUserIds.has(userId)
+    const isBlocked = userBlockedRequester || requesterBlockedUser
 
     const canViewBySetting = (privacySettingValue) => {
       if (privacySettingValue === 'nobody') return false
@@ -188,7 +200,7 @@ async function listDirectoryUsers(requesterId, { q = '', limit = 30 } = {}) {
     }
 
     const result = {
-      id: user._id.toString(),
+      id: userId,
       name: user.name,
       username: user.username || '',
       email: user.email,
@@ -197,12 +209,23 @@ async function listDirectoryUsers(requesterId, { q = '', limit = 30 } = {}) {
       bio: user.bio || '',
       isVerified: Boolean(user.isVerified),
       phone: user.phone || '',
+      isBlocked,
+      canUnblock: requesterBlockedUser,
     }
 
     // Apply privacy settings for lastSeen
     const canViewLastSeen = canViewBySetting(privacy.lastSeen)
 
     result.lastSeen = canViewLastSeen ? user.lastSeen : null
+
+    if (userBlockedRequester) {
+      result.avatar = null
+      result.email = ''
+      result.phone = ''
+      result.bio = ''
+      result.status = 'offline'
+      result.lastSeen = null
+    }
 
     return result
   })
@@ -330,10 +353,16 @@ async function unblockUser(userId, targetUserId) {
     throw error
   }
 
-  await User.updateOne(
-    { _id: userId },
-    { $pull: { blockedUserIds: targetUserId } }
-  )
+  const user = await User.findById(userId).select('_id blockedUserIds').lean()
+  const hasBlockedTarget = Boolean((user?.blockedUserIds || []).includes(targetUserId))
+
+  if (!hasBlockedTarget) {
+    const error = new Error('You can only unblock users you have blocked')
+    error.statusCode = 403
+    throw error
+  }
+
+  await User.updateOne({ _id: userId }, { $pull: { blockedUserIds: targetUserId } })
 
   return { unblockedUserId: targetUserId }
 }

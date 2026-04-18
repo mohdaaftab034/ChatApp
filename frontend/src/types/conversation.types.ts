@@ -11,6 +11,7 @@ export interface Conversation {
   isMuted: boolean
   isArchived: boolean
   isBlocked?: boolean
+  canUnblock?: boolean
   createdAt: string
   group?: {
     name: string

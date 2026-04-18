@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Clock3, Loader2, MessageSquare, Search, Sparkles, X } from 'lucide-react'
 import { useUIStore } from '../../../store/uiStore'
 import { useChatStore } from '../../../store/chatStore'
@@ -6,8 +6,7 @@ import { useAuthStore } from '../../../store/authStore'
 import { Avatar } from '../../../components/shared/Avatar'
 import { cn } from '../../../lib/utils'
 import { useDebounce } from '../../../hooks/useDebounce'
-import { searchMessagesApi } from '../../chat/api/chat.api'
-import { Message } from '../../../types/message.types'
+import { searchGlobalMessagesApi, type MessageSearchResult } from '../../chat/api/chat.api'
 
 type SearchResult = {
   messageId: string
@@ -15,6 +14,10 @@ type SearchResult = {
   text: string
   createdAt: string
   senderLabel: string
+  chatName: string
+  chatAvatar: string | null
+  chatMeta: string
+  isGroup: boolean
 }
 
 export function GlobalSearch() {
@@ -22,100 +25,84 @@ export function GlobalSearch() {
   const [results, setResults] = useState<SearchResult[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const closeModal = useUIStore(s => s.closeModal)
-  const { activeConversationId, conversations, messages } = useChatStore()
+  const { activeConversationId, conversations } = useChatStore()
   const setActiveConversation = useChatStore(s => s.setActiveConversation)
   const currentUserId = useAuthStore(s => s.user?.id)
   const debouncedQuery = useDebounce(query, 300)
 
-  const activeConversation = useMemo(() => {
-    if (!activeConversationId) return null
-    return conversations.find((conversation) => conversation.id === activeConversationId) || null
-  }, [activeConversationId, conversations])
+  const conversationMap = useMemo(() => {
+    return new Map(conversations.map((conversation) => [conversation.id, conversation]))
+  }, [conversations])
 
-  const activeChatInfo = useMemo(() => {
-    if (!activeConversation) {
-      return {
-        chatName: 'this chat',
-        chatAvatar: null,
-        isGroup: false,
-        chatMeta: '',
-      }
-    }
-
-    const isGroup = activeConversation.type === 'group'
-    const otherUser = activeConversation.participants.find((participant) => participant.id !== currentUserId)
+  const toResult = useCallback((message: MessageSearchResult): SearchResult => {
+    const conversation = conversationMap.get(message.conversationId)
+    const isGroup = conversation?.type === 'group'
+    const otherUser = conversation?.participants.find((participant) => participant.id !== currentUserId)
+    const sender = conversation?.participants.find((participant) => participant.id === message.senderId)
 
     return {
-      chatName: isGroup ? activeConversation.group?.name || 'Group chat' : otherUser?.name || 'Direct chat',
-      chatAvatar: isGroup ? activeConversation.group?.avatar || null : otherUser?.avatar || null,
-      isGroup,
-      chatMeta: isGroup
-        ? `${activeConversation.participants.length} members`
-        : `@${otherUser?.username || 'chat'}`,
-    }
-  }, [activeConversation, currentUserId])
-
-  const toResult = (message: Message): SearchResult => {
-    const sender = activeConversation?.participants.find((participant) => participant.id === message.senderId)
-    return {
-      messageId: message.id,
+      messageId: message.messageId,
       conversationId: message.conversationId,
       text: message.text || '',
       createdAt: message.createdAt,
       senderLabel: message.senderId === currentUserId ? 'You' : sender?.name || 'Unknown',
+      chatName: isGroup ? conversation?.group?.name || 'Group chat' : otherUser?.name || 'Direct chat',
+      chatAvatar: isGroup ? conversation?.group?.avatar || null : otherUser?.avatar || null,
+      chatMeta: isGroup ? `${conversation?.participants.length || 0} members` : `@${otherUser?.username || 'chat'}`,
+      isGroup: Boolean(isGroup),
     }
-  }
+  }, [conversationMap, currentUserId])
 
   useEffect(() => {
-    if (!activeConversationId || !activeConversation) {
+    const normalizedQuery = debouncedQuery.trim()
+
+    if (!normalizedQuery || normalizedQuery.length < 2) {
+      setIsLoading(false)
       setResults([])
       return
     }
 
-    const normalizedQuery = debouncedQuery.trim()
-
-    if (!normalizedQuery) {
-      const localMessages = (messages[activeConversationId] || [])
-        .filter((message) => !message.isDeleted && Boolean(message.text?.trim()))
-        .slice()
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-        .slice(0, 12)
-
-      setIsLoading(false)
-      setResults(localMessages.map(toResult))
-      return
-    }
-
-    let isMounted = true
+    const controller = new AbortController()
     setIsLoading(true)
 
     ;(async () => {
       try {
-        const remoteResults = await searchMessagesApi(activeConversationId, normalizedQuery, 30)
-        if (!isMounted) return
+        const remoteResults = await searchGlobalMessagesApi(normalizedQuery, {
+          conversationId: activeConversationId || undefined,
+          limit: 30,
+          signal: controller.signal,
+        })
         setResults(remoteResults.map(toResult))
       } catch (_error) {
-        if (!isMounted) return
+        if (controller.signal.aborted) return
         setResults([])
       } finally {
-        if (isMounted) {
+        if (!controller.signal.aborted) {
           setIsLoading(false)
         }
       }
     })()
 
     return () => {
-      isMounted = false
+      controller.abort()
     }
-  }, [activeConversation, activeConversationId, currentUserId, debouncedQuery, messages])
+  }, [activeConversationId, currentUserId, debouncedQuery, toResult])
 
   const subtitle = useMemo(() => {
-    if (!activeConversation) {
-      return 'Open a conversation first to search its messages.'
+    if (activeConversationId) {
+      const conversation = conversationMap.get(activeConversationId)
+      if (!conversation) return 'Searching in the selected conversation.'
+
+      if (conversation.type === 'group') {
+        return `Searching in ${conversation.group?.name || 'Group chat'}`
+      }
+
+      const otherUser = conversation.participants.find((participant) => participant.id !== currentUserId)
+      return `Searching in ${otherUser?.name || 'Direct chat'}`
     }
 
-    return `Searching in ${activeChatInfo.chatName}`
-  }, [activeChatInfo.chatName, activeConversation])
+    return 'Searching across all conversations'
+  }, [activeConversationId, conversationMap, currentUserId])
 
   const openChat = (conversationId: string) => {
     setActiveConversation(conversationId)
@@ -167,7 +154,7 @@ export function GlobalSearch() {
         </div>
 
         <div className="max-h-[58vh] overflow-y-auto p-2">
-          {activeConversation && hasResults && (
+          {hasResults && (
             <div className="space-y-1">
               {results.map((result) => {
                 return (
@@ -177,18 +164,18 @@ export function GlobalSearch() {
                     onClick={() => openChat(result.conversationId)}
                     className="w-full rounded-xl border border-transparent px-3 py-2.5 flex items-center gap-3 text-left hover:bg-raised hover:border-border transition-colors"
                   >
-                    <Avatar src={activeChatInfo.chatAvatar} fallback={activeChatInfo.chatName} size="md" />
+                    <Avatar src={result.chatAvatar} fallback={result.chatName} size="md" />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm font-medium text-foreground truncate">{activeChatInfo.chatName}</p>
+                        <p className="text-sm font-medium text-foreground truncate">{result.chatName}</p>
                         <span className={cn(
                           'text-[11px] px-2 py-0.5 rounded-full',
-                          activeChatInfo.isGroup ? 'bg-raised text-text-secondary' : 'bg-accent/10 text-accent-foreground'
+                          result.isGroup ? 'bg-raised text-text-secondary' : 'bg-accent/10 text-accent-foreground'
                         )}>
-                          {activeChatInfo.isGroup ? 'Group' : 'Direct'}
+                          {result.isGroup ? 'Group' : 'Direct'}
                         </span>
                       </div>
-                      <p className="text-xs text-text-secondary truncate mt-0.5">{activeChatInfo.chatMeta}</p>
+                      <p className="text-xs text-text-secondary truncate mt-0.5">{result.chatMeta}</p>
                       <p className="text-xs text-text-tertiary truncate mt-0.5">{result.text}</p>
                       <div className="mt-1 flex items-center gap-3 text-[11px] text-text-tertiary">
                         <span>{result.senderLabel}</span>
@@ -210,22 +197,22 @@ export function GlobalSearch() {
                 <Loader2 size={18} className="animate-spin" />
               </div>
               <p className="text-sm font-medium text-foreground">Searching messages</p>
-              <p className="text-xs text-text-secondary mt-1">Fetching matches from this conversation.</p>
+              <p className="text-xs text-text-secondary mt-1">Fetching matches from backend search.</p>
             </div>
           )}
 
-          {!isLoading && (!activeConversation || !hasResults) && (
+          {!isLoading && !hasResults && (
             <div className="py-12 px-4 text-center">
               <div className="mx-auto mb-3 h-10 w-10 rounded-full bg-raised flex items-center justify-center text-text-secondary">
                 <MessageSquare size={18} />
               </div>
               <p className="text-sm font-medium text-foreground">
-                {!activeConversation ? 'Select a conversation first' : 'No messages found'}
+                {debouncedQuery.trim().length < 2 ? 'Type at least 2 characters' : 'No messages found'}
               </p>
               <p className="text-xs text-text-secondary mt-1">
-                {!activeConversation
-                  ? 'Search is limited to the currently open chat.'
-                  : 'Search uses message text in this chat only. Try another word or phrase.'}
+                {debouncedQuery.trim().length < 2
+                  ? 'Search runs through backend indexing when your query is longer.'
+                  : 'Try another word or phrase.'}
               </p>
             </div>
           )}

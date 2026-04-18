@@ -29,6 +29,24 @@ function toConversationPayload(conversation, userId, participantMap) {
   const participantsForConversation = (conversation.participantIds || [])
     .map((id) => participantMap.get(id))
     .filter(Boolean)
+    .map((participant) => {
+      const isDirectConversation = conversation.type === 'direct'
+      const isBlockedByOtherOnly = Boolean(conversation.isBlocked && !conversation.canUnblock)
+      const isOtherParticipant = participant.id !== String(userId)
+
+      if (isDirectConversation && isBlockedByOtherOnly && isOtherParticipant) {
+        return {
+          ...participant,
+          avatar: null,
+          email: '',
+          bio: '',
+          status: 'offline',
+          lastSeen: null,
+        }
+      }
+
+      return participant
+    })
 
   return {
     id: conversation._id,
@@ -40,6 +58,7 @@ function toConversationPayload(conversation, userId, participantMap) {
     isMuted: Boolean(conversation.isMuted),
     isArchived: Boolean(conversation.isArchived),
     isBlocked: Boolean(conversation.type === 'direct' && conversation.isBlocked),
+    canUnblock: Boolean(conversation.type === 'direct' && conversation.canUnblock),
     createdAt: conversation.createdAt,
     group: conversation.group || undefined,
   }
@@ -99,6 +118,7 @@ async function hydrateConversations(conversations, userId) {
       return {
         ...conversation,
         isBlocked: blockState.isBlocked,
+        canUnblock: blockState.viewerBlockedTarget,
       }
     })
   )
@@ -176,6 +196,7 @@ async function startDirectConversation({ userId, targetUserId }) {
     if (otherParticipantId) {
       const blockState = await getBlockState(userId, otherParticipantId)
       conversation.isBlocked = blockState.isBlocked
+      conversation.canUnblock = blockState.viewerBlockedTarget
     }
   }
 
@@ -198,6 +219,7 @@ async function getConversationByIdForUser({ conversationId, userId }) {
     if (otherParticipantId) {
       const blockState = await getBlockState(userId, otherParticipantId)
       conversation.isBlocked = blockState.isBlocked
+      conversation.canUnblock = blockState.viewerBlockedTarget
     }
   }
 

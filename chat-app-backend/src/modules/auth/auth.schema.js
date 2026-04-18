@@ -23,6 +23,23 @@ const loginSchema = z.object({
   query: z.object({}).optional(),
 })
 
+const verifyOtpSchema = z.object({
+  body: z.object({
+    challengeId: z.string().min(10),
+    otp: z.string().trim().length(6),
+  }),
+  params: z.object({}).optional(),
+  query: z.object({}).optional(),
+})
+
+const resendOtpSchema = z.object({
+  body: z.object({
+    challengeId: z.string().min(10),
+  }),
+  params: z.object({}).optional(),
+  query: z.object({}).optional(),
+})
+
 const forgotPasswordSchema = z.object({
   body: z.object({
     email: z.string().email(),
@@ -56,6 +73,8 @@ const refreshSchema = z.object({
 module.exports = {
   signupSchema,
   loginSchema,
+  verifyOtpSchema,
+  resendOtpSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
   refreshSchema,

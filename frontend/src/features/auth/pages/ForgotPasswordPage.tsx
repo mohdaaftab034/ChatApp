@@ -8,6 +8,20 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { forgotPasswordApi } from '../api/auth.api'
 
+function getErrorMessage(error: unknown, fallback: string) {
+  if (typeof error === 'object' && error && 'response' in error) {
+    const response = (error as { response?: { data?: { message?: string } } }).response
+    const message = response?.data?.message
+    if (message) return message
+  }
+
+  if (error instanceof Error && error.message) {
+    return error.message
+  }
+
+  return fallback
+}
+
 const forgotSchema = z.object({
   email: z.string().email('Invalid email address')
 })
@@ -30,7 +44,7 @@ export default function ForgotPasswordPage() {
       toast.success(`Check your inbox — code sent to ${data.email}`)
       navigate('/verify-otp', { state: { email: data.email, mode: 'reset' } })
     } catch (error) {
-      toast.error('Failed to send code')
+      toast.error(getErrorMessage(error, 'Failed to send code'))
     } finally {
       setIsLoading(false)
     }
