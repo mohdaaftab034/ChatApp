@@ -35,7 +35,8 @@ export function ConversationList() {
     
     if (search) {
       if (c.type === 'group' && c.group?.name.toLowerCase().includes(search.toLowerCase())) return true
-      const otherUser = c.participants.find(p => p.id !== currentUserId)
+      const participants = Array.isArray(c.participants) ? c.participants : []
+      const otherUser = participants.find(p => p.id !== currentUserId)
       if (otherUser && (otherUser.name.toLowerCase().includes(search.toLowerCase()) || otherUser.username.toLowerCase().includes(search.toLowerCase()))) return true
       return false
     }
@@ -123,8 +124,10 @@ export function ConversationList() {
           {rowVirtualizer.getVirtualItems().map((virtualRow) => {
             const index = virtualRow.index
             const c = filtered[index]
+            if (!c) return null
             const isGroup = c.type === 'group'
-            const otherUser = c.participants.find(p => p.id !== currentUserId)
+            const participants = Array.isArray(c.participants) ? c.participants : []
+            const otherUser = participants.find(p => p.id !== currentUserId)
             
             const name = isGroup ? c.group?.name : otherUser?.name
             const avatar = isGroup ? c.group?.avatar : otherUser?.avatar

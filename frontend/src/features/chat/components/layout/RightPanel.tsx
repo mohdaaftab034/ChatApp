@@ -79,7 +79,7 @@ export function RightPanel() {
 
   const conversationId = profilePanelConversationId ?? activeConversationId
   const conversation = conversations.find((item) => item.id === conversationId)
-  const targetUser = conversation?.participants.find((participant) => participant.id !== currentUserId)
+  const targetUser = conversation?.participants?.find((participant) => participant.id !== currentUserId)
   const isGroupConversation = conversation?.type === 'group'
   const groupSettings = conversation?.group
   const groupMembers = isGroupConversation ? conversation?.participants ?? [] : []

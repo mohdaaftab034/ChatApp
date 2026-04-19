@@ -23,7 +23,8 @@ export function PinnedSection({ conversations, currentUserId }: PinnedSectionPro
       <div>
         {conversations.map(c => {
           const isGroup = c.type === 'group'
-          const otherUser = c.participants.find(p => p.id !== currentUserId)
+          const participants = Array.isArray(c.participants) ? c.participants : []
+          const otherUser = participants.find(p => p.id !== currentUserId)
           const name = isGroup ? c.group?.name : otherUser?.name
           const avatar = isGroup ? c.group?.avatar : otherUser?.avatar
           const isOnline = isGroup ? false : otherUser?.status === 'online'

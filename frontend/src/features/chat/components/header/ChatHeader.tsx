@@ -50,7 +50,8 @@ export function ChatHeader() {
   if (!conversation) return null
 
   const isGroup = conversation.type === 'group'
-  const otherUser = conversation.participants.find(p => p.id !== currentUserId)
+  const participants = Array.isArray(conversation.participants) ? conversation.participants : []
+  const otherUser = participants.find(p => p.id !== currentUserId)
   
   const name = isGroup ? conversation.group?.name : otherUser?.name
   const avatar = isGroup ? conversation.group?.avatar : otherUser?.avatar
@@ -60,20 +61,21 @@ export function ChatHeader() {
   const otherTypingUsers = typingInThis.filter(id => id !== currentUserId)
   
   let subText: React.ReactNode = ''
-  const formattedLastSeen = otherUser?.lastSeen ? formatLastSeen(otherUser.lastSeen) : null
+  const participantLastSeen = participants.find((participant) => participant.id !== currentUserId)?.lastSeen
+  const formattedLastSeen = participantLastSeen ? formatLastSeen(participantLastSeen) : null
   
   if (otherTypingUsers.length > 0) {
-    const typingNames = otherTypingUsers.map(id => conversation.participants.find(p => p.id === id)?.name).filter(Boolean)
+    const typingNames = otherTypingUsers.map(id => participants.find(p => p.id === id)?.name).filter(Boolean)
     const text = typingNames.length === 1 ? `${typingNames[0]} is typing...` : `${typingNames.length} people are typing...`
     subText = <span className="text-accent-foreground font-medium animate-pulse">{text}</span>
   } else if (isGroup) {
-    subText = `${conversation.participants.length} members`
+    subText = `${participants.length} members`
   } else if (isOnline) {
     subText = <span className="text-online">Online</span>
   } else if (formattedLastSeen) {
     subText = `Offline • Last seen ${formattedLastSeen}`
   } else {
-    subText = 'Offline'
+    subText = 'Offline • Last seen recently'
   }
 
   return (

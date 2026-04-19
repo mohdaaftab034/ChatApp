@@ -16,11 +16,15 @@ function getConnectedUserIds(io) {
   return userIds
 }
 
-function countUserConnections(io, userId) {
+function countUserConnections(io, userId, { excludeSocketId } = {}) {
   let count = 0
   const normalizedUserId = String(userId)
 
   for (const socket of io.of('/').sockets.values()) {
+    if (excludeSocketId && socket.id === excludeSocketId) {
+      continue
+    }
+
     if (String(socket.data?.userId) === normalizedUserId) {
       count += 1
     }
@@ -55,7 +59,7 @@ async function attachPresenceHandlers(io, socket) {
   }
 
   socket.on('disconnect', async () => {
-    const remainingConnections = countUserConnections(io, userId)
+    const remainingConnections = countUserConnections(io, userId, { excludeSocketId: socket.id })
     if (remainingConnections > 0) {
       return
     }

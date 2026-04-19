@@ -25,7 +25,7 @@ export function MessageList() {
 
   const getSenderName = (senderId: string) => {
     if (senderId === currentUserId) return 'You'
-    const sender = activeConversation?.participants.find((participant) => participant.id === senderId)
+    const sender = activeConversation?.participants?.find((participant) => participant.id === senderId)
     return sender?.name || 'Unknown'
   }
 
