@@ -10,6 +10,7 @@
 
 import { useQuery, useMutation } from '@tanstack/react-query'
 import axios from 'axios'
+import { queryClient } from '../../lib/queryClient'
 
 export interface PrivacySettings {
   lastSeen: 'nobody' | 'contacts' | 'everyone'
@@ -548,12 +549,10 @@ export const PrivacyModal: React.FC<PrivacyModalProps> = ({ isOpen, onClose }) =
  *         onClose={() => setShowPrivacyModal(false)}
  *       />
  *
- *       {/* Or use full page */}
+ *       // Or use full page
  *       <PrivacySettingsPage />
  *     </>
  *   )
  * }
  */
 
-// Export all components
-export { PrivacySettingsPage, PrivacyPanel, PrivacyModal, usePrivacySettings }
