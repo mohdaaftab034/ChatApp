@@ -8,6 +8,7 @@ const env = require('./config/env')
 const { apiLimiter, authLimiter } = require('./middleware/rateLimiter')
 const { notFound } = require('./middleware/notFound')
 const { errorHandler } = require('./middleware/errorHandler')
+const { buildAllowedOrigins, isAllowedOrigin } = require('./utils/origin')
 
 const authRoutes = require('./modules/auth/auth.routes')
 const userRoutes = require('./modules/user/user.routes')
@@ -22,27 +23,23 @@ const privacyRoutes = require('./modules/privacy/privacy.routes')
 
 const app = express()
 
-function isAllowedOrigin(origin) {
-  if (!origin) return true
-  if (origin === env.CLIENT_URL) return true
-
-  if (env.NODE_ENV === 'development') {
-    return /^https?:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)
-  }
-
-  return false
-}
+const allowedOrigins = buildAllowedOrigins({
+  clientUrl: env.CLIENT_URL,
+  clientUrls: env.CLIENT_URLS,
+})
 
 app.use(helmet())
 app.use(cors({
   origin: (origin, callback) => {
-    if (isAllowedOrigin(origin)) {
+    if (isAllowedOrigin(origin, { allowedOrigins, nodeEnv: env.NODE_ENV })) {
       return callback(null, true)
     }
 
     return callback(new Error(`CORS blocked for origin: ${origin}`))
   },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }))
 app.use(express.json({ limit: '2mb' }))
 app.use(express.urlencoded({ extended: true }))

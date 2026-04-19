@@ -7,6 +7,30 @@ Currently, two official plugins are available:
 - [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
 - [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
 
+## Environment Variables
+
+Frontend environment variables are read from `.env` and must use the `VITE_` prefix.
+
+- `VITE_URL`: Optional backend base URL alias.
+- `VITE_API_URL`: Backend REST URL (for example `https://your-backend.onrender.com/api`).
+- `VITE_SOCKET_URL`: Backend socket URL (for example `https://your-backend.onrender.com`).
+
+Local example:
+
+```env
+VITE_URL=http://localhost:4000
+VITE_API_URL=http://localhost:4000/api
+VITE_SOCKET_URL=http://localhost:4000
+```
+
+Render example:
+
+```env
+VITE_URL=https://your-backend.onrender.com
+VITE_API_URL=https://your-backend.onrender.com/api
+VITE_SOCKET_URL=https://your-backend.onrender.com
+```
+
 ## React Compiler
 
 The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).

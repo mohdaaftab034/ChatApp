@@ -44,6 +44,7 @@ const envSchema = z.object({
   PORT: z.coerce.number().default(4000),
   API_PREFIX: z.string().default('/api'),
   CLIENT_URL: z.string().url(),
+  CLIENT_URLS: z.string().optional().default(''),
   MONGODB_URI: z.string().min(1),
   JWT_ACCESS_SECRET: z.string().min(8),
   JWT_REFRESH_SECRET: z.string().min(8),

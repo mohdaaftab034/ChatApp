@@ -2,7 +2,8 @@ import { io, Socket } from 'socket.io-client'
 import { useAuthStore } from '../store/authStore'
 import { ClientToServerEvents, ServerToClientEvents } from '../types/socket.types'
 
-const URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:4000'
+const baseUrl = import.meta.env.VITE_URL || 'http://localhost:4000'
+const URL = import.meta.env.VITE_SOCKET_URL || baseUrl
 
 // Create a singleton socket.io-client instance
 export const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(URL, {

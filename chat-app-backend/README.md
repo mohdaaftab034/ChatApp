@@ -39,6 +39,14 @@ npm run dev
 
 Server runs by default on `http://localhost:4000`.
 
+## Production Security Notes
+
+- Keep secrets only in backend environment variables (Render Environment settings), never in frontend source.
+- Frontend `VITE_*` variables are public by design and should contain only public URLs (for example API/socket base URL), not secrets.
+- Set `CLIENT_URL` to your primary frontend origin.
+- If you have more than one frontend host (for example production + staging), set `CLIENT_URLS` as a comma-separated list of additional origins.
+- Use `.env.example` as a template and keep real values in `.env` locally and in Render env vars.
+
 ## Auth APIs
 
 Base path: `/api/auth`

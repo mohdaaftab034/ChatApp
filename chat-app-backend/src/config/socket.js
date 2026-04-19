@@ -2,25 +2,20 @@ const { Server } = require('socket.io')
 const env = require('./env')
 const registerSocketHandlers = require('../sockets')
 const { verifyAccessToken } = require('../utils/jwt')
+const { buildAllowedOrigins, isAllowedOrigin } = require('../utils/origin')
 
 let io
 
-function isAllowedOrigin(origin) {
-  if (!origin) return true
-  if (origin === env.CLIENT_URL) return true
-
-  if (env.NODE_ENV === 'development') {
-    return /^https?:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)
-  }
-
-  return false
-}
+const allowedOrigins = buildAllowedOrigins({
+  clientUrl: env.CLIENT_URL,
+  clientUrls: env.CLIENT_URLS,
+})
 
 function initSocket(httpServer) {
   io = new Server(httpServer, {
     cors: {
       origin: (origin, callback) => {
-        if (isAllowedOrigin(origin)) {
+        if (isAllowedOrigin(origin, { allowedOrigins, nodeEnv: env.NODE_ENV })) {
           return callback(null, true)
         }
 
