@@ -5,6 +5,11 @@ const logger = require('../utils/logger')
 let redis
 
 async function initRedis() {
+  if (!env.REDIS_URL) {
+    logger.info('Redis not configured, continuing without cache')
+    return null
+  }
+
   redis = new Redis(env.REDIS_URL, { lazyConnect: true, maxRetriesPerRequest: 2 })
   redis.on('error', (error) => logger.warn(`Redis error: ${error.message}`))
 

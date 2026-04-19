@@ -49,7 +49,7 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(8),
   JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
-  REDIS_URL: z.string().min(1),
+  REDIS_URL: z.string().min(1).optional().default(''),
   SMTP_HOST: z.string().min(1),
   SMTP_PORT: z.coerce.number().default(2525),
   SMTP_USER: z.string().min(1),

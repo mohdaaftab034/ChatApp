@@ -15,6 +15,8 @@ Core setup:
 - JWT authentication (access + refresh)
 - Socket.io bootstrapped in `server.js`
 
+Redis is optional for local or Render deployments. If `REDIS_URL` is not set, refresh-token persistence falls back to in-memory-only behavior for the current process.
+
 ## Getting Started
 
 1. Copy env file:
