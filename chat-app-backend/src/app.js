@@ -49,6 +49,17 @@ app.use(express.urlencoded({ extended: true }))
 app.use(cookieParser())
 app.use(morgan('dev'))
 
+app.get('/', (_req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'Chat App Backend is running',
+    data: {
+      health: '/health',
+      apiBase: env.API_PREFIX,
+    },
+  })
+})
+
 app.get('/health', (_req, res) => {
   res.status(200).json({ success: true, message: 'OK' })
 })
