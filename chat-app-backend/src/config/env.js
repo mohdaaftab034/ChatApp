@@ -1,7 +1,8 @@
+const path = require('path')
 const { z } = require('zod')
 const dotenv = require('dotenv')
 
-dotenv.config()
+dotenv.config({ path: path.resolve(__dirname, '../../.env') })
 
 function normalizeCredential(value) {
   return String(value || '').replace(/\s+/g, '').trim()
@@ -64,7 +65,13 @@ const envSchema = z.object({
 const parsed = envSchema.safeParse(mergedEnv)
 
 if (!parsed.success) {
-  throw new Error(`Invalid environment variables: ${parsed.error.message}`)
+  const missing = parsed.error.issues
+    .filter(i => i.code === 'invalid_type' && i.received === 'undefined')
+    .map(i => i.path.join('.'))
+  throw new Error(
+    `Missing environment variables: ${missing.join(', ')}.\n` +
+    `Set them in your Vercel project dashboard (Settings → Environment Variables) and redeploy.`
+  )
 }
 
 module.exports = parsed.data
