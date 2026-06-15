@@ -11,11 +11,9 @@ This project uses a modular architecture under `src/modules/*` with dedicated la
 - `*.schema.js`: Zod request validation
 
 Core setup:
-- Express + MongoDB + Redis
+- Express + MongoDB
 - JWT authentication (access + refresh)
 - Socket.io bootstrapped in `server.js`
-
-Redis is optional for local or Render deployments. If `REDIS_URL` is not set, refresh-token persistence falls back to in-memory-only behavior for the current process.
 
 ## Getting Started
 

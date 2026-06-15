@@ -5,7 +5,6 @@ const { hashPassword, comparePassword } = require('../../utils/hash')
 const { signAccessToken, signRefreshToken, verifyRefreshToken } = require('../../utils/jwt')
 const { generateOtp } = require('../../utils/otp')
 const { sendEmail } = require('../../utils/email')
-const { getRedis } = require('../../config/redis')
 
 function escapeHtml(value) {
   return String(value || '')
@@ -137,12 +136,6 @@ function buildAuthTokens(user) {
     token: signAccessToken(payload),
     refreshToken: signRefreshToken(payload),
   }
-}
-
-async function persistRefreshToken(userId, refreshToken) {
-  const redis = getRedis()
-  if (!redis) return
-  await redis.set(`refresh:${userId}`, refreshToken)
 }
 
 async function sendAuthOtpChallenge({ email, purpose, metadata }) {
@@ -353,7 +346,6 @@ async function verifyOtp({ challengeId, otp }) {
   await otpRecord.save()
 
   const tokens = buildAuthTokens(user)
-  await persistRefreshToken(user._id.toString(), tokens.refreshToken)
 
   return { user: buildPublicUser(user), ...tokens }
 }
@@ -429,16 +421,6 @@ async function refreshToken({ refreshToken }) {
 
   const payload = verifyRefreshToken(refreshToken)
 
-  const redis = getRedis()
-  if (redis) {
-    const stored = await redis.get(`refresh:${payload.sub}`)
-    if (!stored || stored !== refreshToken) {
-      const error = new Error('Invalid refresh token')
-      error.statusCode = 401
-      throw error
-    }
-  }
-
   const user = await User.findById(payload.sub)
   if (!user) {
     const error = new Error('User not found')
@@ -447,7 +429,6 @@ async function refreshToken({ refreshToken }) {
   }
 
   const tokens = buildAuthTokens(user)
-  await persistRefreshToken(user._id.toString(), tokens.refreshToken)
 
   return { user: buildPublicUser(user), ...tokens }
 }
